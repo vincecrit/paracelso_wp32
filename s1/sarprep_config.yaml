@@ -1,0 +1,3 @@
+GRAPHS_WD: !Path .\graphs
+OUTFOLDER: !Path .\output
+AOI_GPKG: !Path .\aoi.gpkg

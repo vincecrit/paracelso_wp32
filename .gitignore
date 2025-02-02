@@ -1,0 +1,12 @@
+__pycache__
+ipynb
+other
+cds
+scripts_notebooks
+*optional*
+eoreader*.py
+conda*.txt
+deactivate.bat
+activate.bat
+wp32
+output
