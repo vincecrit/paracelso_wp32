@@ -9,9 +9,8 @@ from rasterio.warp import Resampling, calculate_default_transform, reproject
 from skimage.registration import optical_flow_ilk, optical_flow_tvl1, phase_cross_correlation
 from ot.interfaces import OTAlgorithm
 
+
 # potrei evitare di usarla
-
-
 def write_raster(fpath: str | Path, band: int, array: np.ndarray, metadata: dict) -> None:
     with rasterio.open(fp=str(fpath), mode='w', **metadata) as dst:
         dst.write_band(band, array)
@@ -93,11 +92,12 @@ class OpenCVOpticalFlow(OTAlgorithm):
             - `OPTFLOW_Flags.OPTFLOW_FARNEBACK_GAUSSIAN` (256) uses the Gaussian filter instead of a box filter of the same size for optical flow estimation. Usually, this option gives more accurate flow than with a box filter, at the cost of lower speed. Defaults to OPTFLOW_Flags.OPTFLOW_FARNEBACK_GAUSSIAN.
     """
 
-    def __init__(self, flow: np.ndarray = False, pyr_scale: float = 0.5,
-                 levels: int = 4, winsize: int = 16, iterations: int = 5,
-                 poly_n: int = 5, poly_sigma: float = 1.1,
+    def __init__(self, band: int | list[int] = 1, flow: np.ndarray = False,
+                 pyr_scale: float = 0.5, levels: int = 4, winsize: int = 16,
+                 iterations: int = 5, poly_n: int = 5, poly_sigma: float = 1.1,
                  flags: int = OPTFLOW_Flags.OPTFLOW_DEFAULT) -> None:
 
+        self.band = band
         self.flow = flow
         self.pyr_scale = pyr_scale
         self.levels = levels
@@ -195,8 +195,8 @@ class OpenCVOpticalFlow(OTAlgorithm):
             kwargs['target'], kwargs['reference'], coreg_output)
 
         reference = rasterio.open(
-            kwargs['reference']).read(2).astype(np.float32)
-        target = rasterio.open(coreg_output).read(2).astype(np.float32)
+            kwargs['reference']).read(cls.band).astype(np.float32)
+        target = rasterio.open(coreg_output).read(cls.band).astype(np.float32)
         mask = ~rasterio.open(coreg_output).dataset_mask().astype(bool)
         meta = rasterio.open(coreg_output).meta
 
@@ -214,9 +214,13 @@ class OpenCVOpticalFlow(OTAlgorithm):
 
 
 class SkiOpticalFlowILV(OTAlgorithm):
-    def __init__(self, radius=7, num_warp=10, gaussian=False,
-                 prefilter=False, dtype=np.float32):
+    band = 1
 
+    def __init__(self, band: int | list[int] = 1, radius=7,
+                 num_warp=10, gaussian=False, prefilter=False,
+                 dtype=np.float32):
+
+        self.band = band
         self.radius = radius
         self.num_warp = num_warp
         self.gaussian = gaussian
@@ -282,8 +286,8 @@ class SkiOpticalFlowILV(OTAlgorithm):
             kwargs['target'], kwargs['reference'], coreg_output)
 
         reference = rasterio.open(
-            kwargs['reference']).read(2).astype(np.float32)
-        target = rasterio.open(coreg_output).read(2).astype(np.float32)
+            kwargs['reference']).read(cls.band).astype(np.float32)
+        target = rasterio.open(coreg_output).read(cls.band).astype(np.float32)
         mask = ~rasterio.open(coreg_output).dataset_mask().astype(bool)
         meta = rasterio.open(coreg_output).meta
 
@@ -301,9 +305,12 @@ class SkiOpticalFlowILV(OTAlgorithm):
 
 
 class SkiOpticalFlowTVL1(OTAlgorithm):
-    def __init__(self, attachment=15, tightness=0.3, num_warp=5, num_iter = 10,
-                 tol=1e-4, prefilter=False, dtype=np.float32):
-        
+    # band = 1
+    def __init__(self, band=1, attachment=15, tightness=0.3,
+                 num_warp=5, num_iter=10, tol=1e-4, prefilter=False,
+                 dtype=np.float32):
+
+        self.band = band
         self.attachment = attachment
         self.tightness = tightness
         self.num_warp = num_warp
@@ -358,13 +365,13 @@ class SkiOpticalFlowTVL1(OTAlgorithm):
 
         pixel_offsets = optical_flow_tvl1(
             reference, target,
-            attachment = self.attachment,
-            tightness = self.tightness,
-            num_warp = self.num_warp,
-            num_iter = self.num_iter,
-            tol = self.tol,
-            prefilter = self.prefilter,
-            dtype = self.dtype)
+            attachment=self.attachment,
+            tightness=self.tightness,
+            num_warp=self.num_warp,
+            num_iter=self.num_iter,
+            tol=self.tol,
+            prefilter=self.prefilter,
+            dtype=self.dtype)
 
         return self._to_displacements(meta, pixel_offsets)
 
@@ -379,8 +386,9 @@ class SkiOpticalFlowTVL1(OTAlgorithm):
             kwargs['target'], kwargs['reference'], coreg_output)
 
         reference = rasterio.open(
-            kwargs['reference']).read(2).astype(np.float32)
-        target = rasterio.open(coreg_output).read(2).astype(np.float32)
+            kwargs['reference']).read(kwargs['band']).astype(np.float32)
+        target = rasterio.open(coreg_output).read(
+            kwargs['band']).astype(np.float32)
         mask = ~rasterio.open(coreg_output).dataset_mask().astype(bool)
         meta = rasterio.open(coreg_output).meta
 
