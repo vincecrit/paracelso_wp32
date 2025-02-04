@@ -20,6 +20,7 @@ class Graphs(Enum):
     S1SLC_DFLT = GRAPHS_WD / "prep_s1_slc_default.xml"
     S1SLC_DFLTB3 = GRAPHS_WD / "prep_s1_slc_default+band3.xml"
     S1SLC_NOSF = GRAPHS_WD / "prep_s1_slc_noSpeckleFilter.xml"
+    S1SLC_NOSFB3 = GRAPHS_WD / "prep_s1_slc_noSpeckleFilter+band3.xml"
 
 
 @unique
