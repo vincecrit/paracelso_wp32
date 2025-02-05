@@ -21,6 +21,8 @@ def get_parser() -> argparse.ArgumentParser:
     parser.add_argument("-o", "--output",
                         help="Output file",
                         default='output.tif', type=str)
+    parser.add_argument("--nodata", help="Valore di nodata",
+                        default=None, type=float)
     parser.add_argument("-b", "--band",
                         help="Banda da utilizzare, Se non indicata verranno utilizzate tutte le disponibili.",
                         default=None, type=int)
@@ -87,25 +89,31 @@ def main_rev() -> None:
 
     basic_pixel_coregistration(args.target, args.reference, target_coreg)
 
+
     with rasterio.open(args.reference) as refimg:
         with rasterio.open(target_coreg) as tarimg:
 
             reference_array = refimg.read(args.band).astype(np.float32)
             target_array = tarimg.read(args.band).astype(np.float32)
 
+            if args.nodata is not None:
+                NODATA3B = NODATA1B = args.nodata
+            else:
+                NODATA3B, NODATA1B = -9999, reference_array.min()
+
             if reference_array.ndim > 2:
-                target_mask = reference_array[-1, :, :] == -9999
-                reference_array[0, :, :][target_mask] = -9999
-                reference_array[1, :, :][target_mask] = -9999
+                target_mask = reference_array[-1, :, :] == NODATA3B
+                reference_array[0, :, :][target_mask] = NODATA3B
+                reference_array[1, :, :][target_mask] = NODATA3B
 
             else:
-                target_mask = reference_array == reference_array.min()
+                target_mask = reference_array == NODATA1B
                 reference_array = np.ma.masked_array(
                     reference_array, target_mask)
                 target_array = np.ma.masked_array(target_array, target_mask)
 
             target_metadata = tarimg.meta.copy()
-            target_metadata['nodata'] = reference_array.min()
+            target_metadata['nodata'] = NODATA1B
 
     if args.rgb2gray:
         if args.band is not None:
