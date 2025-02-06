@@ -14,5 +14,5 @@ REM python -m s1.preprocessing ".\aoi.gpkg|aoi_baldiola" S1_SLC_NO_SPECKLE_FILTE
 ECHO PREPROCESSING IMMAGINI SENTINEL-1 (2 DI 2)
 REM python -m s1.preprocessing ".\aoi.gpkg|aoi_baldiola" S1_SLC_NO_SPECKLE_FILTER %S1SLC2%
 
-python -m s1.preprocessing ".\aoi.gpkg|aoi_calita" S1_SLC_DEFAULT_BAND3 %S1SLC1%
-python -m s1.preprocessing ".\aoi.gpkg|aoi_calita" S1_SLC_DEFAULT_BAND3 %S1SLC2%
+python -m s1.preprocessing ".\aoi.gpkg|aoi_calita" S1_SLC_NO_SPECKLE_FILTER_BAND3 %S1SLC1%
+python -m s1.preprocessing ".\aoi.gpkg|aoi_calita" S1_SLC_NO_SPECKLE_FILTER_BAND3 %S1SLC2%

@@ -1,11 +1,99 @@
 import json
+import sys
 from enum import Enum, unique
+from itertools import product
 from pathlib import Path
 
 import cv2
+import geopandas as gpd
 import numpy as np
-from skimage.registration import optical_flow_ilk, optical_flow_tvl1
+import pandas as pd
+import rasterio
+from geopandas import points_from_xy
+from numpy.lib.stride_tricks import as_strided
+from rasterio.transform import AffineTransformer
+from skimage.registration import (optical_flow_ilk, optical_flow_tvl1,
+                                  phase_cross_correlation)
+
 from ot.interfaces import OTAlgorithm
+
+
+def to_uint8(floatarray: np.ndarray) -> np.ndarray:
+    return (floatarray*255).astype('uint8')
+
+
+def cv2_equalize_channels(array: np.ndarray) -> np.ndarray:
+    try:
+        *(rows, cols), channels = array.shape
+        print(rows, cols, channels)
+
+    except ValueError:
+        print('non ha 3 canali')
+        return cv2_equalize_channels(array.reshape(*array.shape, 1))
+
+    eq = list()
+    for channel in range(channels):
+        eq.append(cv2.equalizeHist(array[..., channel]))
+
+    return cv2.merge(eq)
+
+
+def rasterio_to_cv2(source: str):
+    with rasterio.open(source) as src:
+        print(src.meta)
+        bands = []
+        for b in range(src.count):
+            bands.append(to_uint8(src.read(b + 1)))
+
+        return cv2.merge(bands)
+
+
+class Image:
+    def __init__(self, source: str):
+        assert Path(source).exists(), f"File {source} does not exist"
+        assert Path(source).is_file(), f"File {source} is not a file"
+
+        self.source = Path(source)
+        suffix = self.source.suffix
+
+        if suffix in ['.tiff', '.tif']:
+            self.image = rasterio_to_cv2(str(self.source))
+            with rasterio.open(str(self.source)) as src:
+                self.affine = src.meta['transform']
+                self.crs = src.meta['crs']
+
+        elif suffix in ['.jpg', '.jpeg', '.png']:
+            self.image = cv2.imread(str(self.source), cv2.IMREAD_COLOR)
+            self.affine = None
+
+    def split_channels(self):
+        return cv2.split(self.image)
+
+
+def stepped_rolling_window(arr, win_shape, step=(1, 1)):
+    """Applica una rolling window con passo su un array 2D.
+
+    Args:
+        arr (np.ndarray): Array 2D di input.
+        win_shape (tuple): Dimensione della finestra (win_h, win_w).
+        step (tuple): Passo della finestra (step_h, step_w).
+
+    Returns:
+        np.ndarray: Array 4D con viste delle finestre (n_rows, n_cols, win_h, win_w).
+    """
+    win_h, win_w = win_shape
+    step_h, step_w = step
+    arr_h, arr_w = arr.shape
+
+    # Calcoliamo il numero di finestre lungo ogni dimensione
+    out_shape = ((arr_h - win_h) // step_h + 1,
+                 (arr_w - win_w) // step_w + 1, win_h, win_w)
+
+    # Creiamo le strided views
+    strides = (arr.strides[0] * step_h, arr.strides[1]
+               * step_w, arr.strides[0], arr.strides[1])
+
+    return as_strided(arr, shape=out_shape, strides=strides)
 
 
 @unique
@@ -261,3 +349,71 @@ class SkiOpticalFlowTVL1(OTAlgorithm):
             dtype=self.dtype)
 
         return self._to_displacements(meta, pixel_offsets)
+
+
+def process_image(image: np.ndarray, win_size: tuple, step_size: tuple) -> np.ndarray:
+    return stepped_rolling_window(image, win_size, step_size).reshape(-1, *win_size)
+
+
+def xcorr_to_geopandas(ref: Image, tar: Image,
+                       win_size: tuple[int] | int,
+                       step_size: tuple[int] | int,
+                       normalization: str | None = 'phase',
+                       upsample_factor: int | float = 1.0) -> gpd.GeoDataFrame:
+    """
+    Cross-correlazione di immagini. Di default, normalizza le immagini attraverso FFT,
+    (eseguendo una cross-correlazione di fase o PCC); assegnando `None` alla variabile
+    `normalization` si esegue una cross-correlazione NON normalizzata.
+
+    Arguments:
+
+        ref, tar (Image): immagini di reference e target (geotiff)
+        win_size (tuple[int] | int): dimensione finestra mobile. Se è pari a un numero
+        intero (n), verrà assunta una finestra mobile quadrata (nxn)
+        step_size (tuple[int] | int): intervallo di campionamento. L'immagine verrà 
+        scomposta in tante finestre mobili centrate su punti dell'immagine distanziati di
+        `step_size` pixels.
+        normalization (str | None): tipo di normalizzazione, `phase` per PCC, `None` per
+        CC non normalizzata. Default = `phase`
+        upsample_factor (int | float): rapporto di sovracampionamento (?). Le immagini
+        verranno registrate con una dimensione dei pixel pari a `1 / upsample_factor`.
+        Utile per identificare spostamenti a scala di sub-pixel. Influenza molto il carico
+        di calcolo necessario.
+
+    Returns:
+
+        (geopandas.GeoDataFrame): shapefile di output. Vengono memorizzati gli attributi di
+        spostamento risultante (L2) e spostamento lungo le righe (RSHIFT) e colonne (CSHIFT).
+        Tutti gli spostamenti sono espressi nell'unità di misura propria delle immagini di
+        partenza.
+
+    """
+
+    if isinstance(win_size, int):
+        win_size = win_size, win_size
+
+    if isinstance(step_size, int):
+        step_size = step_size, step_size
+
+    _ref = process_image(ref.image, win_size, step_size)
+    _tar = process_image(tar.image, win_size, step_size)
+
+    i = np.arange(step_size[0], ref.image.shape[0], step_size[0]).astype(int)
+    j = np.arange(step_size[1], ref.image.shape[1], step_size[1]).astype(int)
+    index = np.array(list(product(i, j)))
+
+    offset_record = list()
+
+    for (e, r, t) in zip(index, _ref, _tar):
+        (sr, sc), _, _ = phase_cross_correlation(
+            r, t, normalization=normalization, upsample_factor=upsample_factor)
+        l2 = np.sqrt(sr**2 + sc**2)
+        offset_record.append(tuple([l2, float(sr), float(sc)]))
+
+    transfomer = AffineTransformer(ref.affine)
+    df = pd.DataFrame(offset_record, columns=[
+                      "L2", "RSHIFT", "CSHIFT"]) * ref.affine.a  # pixel -> metri
+    coords = np.c_[transfomer.xy(*index.T)]
+    geom = points_from_xy(*zip(*coords), crs=ref.crs.to_string())
+
+    return gpd.GeoDataFrame(df, geometry=geom)  # .to_file("corvara.shp")
