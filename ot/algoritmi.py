@@ -1,99 +1,92 @@
 import json
-import sys
 from enum import Enum, unique
-from itertools import product
 from pathlib import Path
 
 import cv2
 import geopandas as gpd
 import numpy as np
 import pandas as pd
-import rasterio
 from geopandas import points_from_xy
-from numpy.lib.stride_tricks import as_strided
 from rasterio.transform import AffineTransformer
 from skimage.registration import (optical_flow_ilk, optical_flow_tvl1,
                                   phase_cross_correlation)
 
-from ot.interfaces import OTAlgorithm
+from ot.interfaces import OTAlgorithm, Image
+from ot.normalize import stepped_rolling_window
 
 
-def to_uint8(floatarray: np.ndarray) -> np.ndarray:
-    return (floatarray*255).astype('uint8')
+def xcorr_to_geopandas(ref: Image, tar: Image,
+                       win_size: tuple[int] | int,
+                       step_size: tuple[int] | int,
+                       normalization: str | None = 'phase',
+                       upsample_factor: int | float = 1.0) -> gpd.GeoDataFrame | pd.DataFrame:
+    """
+    Cross-correlazione di immagini. Di default, normalizza le immagini
+    attraverso FFT, eseguendo quindi una cross-correlazione di fase (PCC);
+    assegnando `None` alla variabile `normalization` si esegue una
+    cross-correlazione NON normalizzata.
 
-
-def cv2_equalize_channels(array: np.ndarray) -> np.ndarray:
-    try:
-        *(rows, cols), channels = array.shape
-        print(rows, cols, channels)
-
-    except ValueError:
-        print('non ha 3 canali')
-        return cv2_equalize_channels(array.reshape(*array.shape, 1))
-
-    eq = list()
-    for channel in range(channels):
-        eq.append(cv2.equalizeHist(array[..., channel]))
-
-    return cv2.merge(eq)
-
-
-def rasterio_to_cv2(source: str):
-    with rasterio.open(source) as src:
-        print(src.meta)
-        bands = []
-        for b in range(src.count):
-            bands.append(to_uint8(src.read(b + 1)))
-
-        return cv2.merge(bands)
-
-
-class Image:
-    def __init__(self, source: str):
-        assert Path(source).exists(), f"File {source} does not exist"
-        assert Path(source).is_file(), f"File {source} is not a file"
-
-        self.source = Path(source)
-        suffix = self.source.suffix
-
-        if suffix in ['.tiff', '.tif']:
-            self.image = rasterio_to_cv2(str(self.source))
-            with rasterio.open(str(self.source)) as src:
-                self.affine = src.meta['transform']
-                self.crs = src.meta['crs']
-
-        elif suffix in ['.jpg', '.jpeg', '.png']:
-            self.image = cv2.imread(str(self.source), cv2.IMREAD_COLOR)
-            self.affine = None
-
-    def split_channels(self):
-        return cv2.split(self.image)
-
-
-def stepped_rolling_window(arr, win_shape, step=(1, 1)):
-    """Applica una rolling window con passo su un array 2D.
+    Le due immagini di input vengono elaborate mediante la medesima finestra.
 
     Args:
-        arr (np.ndarray): Array 2D di input.
-        win_shape (tuple): Dimensione della finestra (win_h, win_w).
-        step (tuple): Passo della finestra (step_h, step_w).
+        ref, tar (Image): immagini di reference e target (geotiff)
+        win_size (tuple[int] | int): dimensione finestra mobile. Se è pari a un
+        numero intero (n), verrà assunta una finestra mobile quadrata (nxn)
+        step_size (tuple[int] | int): intervallo di campionamento. L'immagine
+        verrà scomposta in tante finestre mobili centrate su punti dell'immagine
+        distanziati di `step_size` pixels.
+        normalization (str | None): tipo di normalizzazione, `phase` per PCC,
+        `None` per CC non normalizzata. Default = `phase`
+        upsample_factor (int | float): rapporto di sovracampionamento (?).
+        Le immagini verranno registrate con una dimensione dei pixel pari a
+        `1 / upsample_factor`. Utile per identificare spostamenti a scala di
+        sub-pixel. Influenza molto il carico di calcolo necessario.
 
     Returns:
-        np.ndarray: Array 4D con viste delle finestre (n_rows, n_cols, win_h, win_w).
+        frame (geopandas.GeoDataFrame | pandas.DataFrame): shapefile o
+        dataframe di output (dipende dal tipo di immagine: raster -> shapefile)
+        Vengono memorizzati gli attributi di spostamento risultante (L2) e
+        spostamento lungo le righe (RSHIFT) e colonne (CSHIFT). Tutti gli
+        spostamenti sono espressi nell'unità di misura propria delle immagini
+        di partenza.
     """
-    win_h, win_w = win_shape
-    step_h, step_w = step
-    arr_h, arr_w = arr.shape
 
-    # Calcoliamo il numero di finestre lungo ogni dimensione
-    out_shape = ((arr_h - win_h) // step_h + 1,
-                 (arr_w - win_w) // step_w + 1, win_h, win_w)
+    if isinstance(win_size, int):
+        win_size = win_size, win_size
 
-    # Creiamo le strided views
-    strides = (arr.strides[0] * step_h, arr.strides[1]
-               * step_w, arr.strides[0], arr.strides[1])
+    if isinstance(step_size, int):
+        step_size = step_size, step_size
 
-    return as_strided(arr, shape=out_shape, strides=strides)
+    index, _ref = stepped_rolling_window(ref.image, win_size, step_size)
+    assert index.shape[0] == _ref.shape[0], f"{index.shape[0] =} {_ref.shape[0] =}"
+    _, _tar = stepped_rolling_window(tar.image, win_size, step_size)
+
+    offset_record = list()
+    for (r, t) in zip(_ref, _tar):
+        (sr, sc), _, _ = phase_cross_correlation(r, t,
+                                                 normalization=normalization,
+                                                 upsample_factor=upsample_factor)
+
+        L2 = np.sqrt(sr**2 + sc**2)  # risultante dello spostamento
+        row = L2, float(sr), float(sc)
+        offset_record.append(row)
+
+    columns = ["L2", "RSHIFT", "CSHIFT"]
+    df = pd.DataFrame(offset_record, columns=columns)
+
+    if ref.affine is not None:  # caso del raster di input
+        transfomer = AffineTransformer(ref.affine)
+        df *= ref.affine.a  # pixel -> metri
+        coords = np.c_[transfomer.xy(*index.T)]
+        geom = points_from_xy(*zip(*coords), crs=ref.crs.to_string())
+
+        return gpd.GeoDataFrame(df, geometry=geom)
+
+    else:  # caso di immagini *.jpeg ecc..
+        x, y = index.T
+        df.insert(0, 'Y', y)
+        df.insert(0, 'X', x)
+        return df
 
 
 @unique
@@ -103,7 +96,6 @@ class OPTFLOW_Flags(Enum):
     OPTFLOW_FARNEBACK_GAUSSIAN = 256  # cv2.OPTFLOW_FARNEBACK_GAUSSIAN
 
 
-# definisco una classe con argomenti di default (__init__)
 class OpenCVOpticalFlow(OTAlgorithm):
     """
     Wrap-up per la funzione `calcOpticalFlowFarneback` di OpenCV.
@@ -126,12 +118,11 @@ class OpenCVOpticalFlow(OTAlgorithm):
             - `OPTFLOW_Flags.OPTFLOW_FARNEBACK_GAUSSIAN` (256) uses the Gaussian filter instead of a box filter of the same size for optical flow estimation. Usually, this option gives more accurate flow than with a box filter, at the cost of lower speed. Defaults to OPTFLOW_Flags.OPTFLOW_FARNEBACK_GAUSSIAN.
     """
 
-    def __init__(self, band: int | list[int] = 1, flow: np.ndarray = False,
+    def __init__(self, flow: np.ndarray = False,
                  pyr_scale: float = 0.5, levels: int = 4, winsize: int = 16,
                  iterations: int = 5, poly_n: int = 5, poly_sigma: float = 1.1,
                  flags: int = OPTFLOW_Flags.OPTFLOW_DEFAULT) -> None:
 
-        self.band = band
         self.flow = flow
         self.pyr_scale = pyr_scale
         self.levels = levels
@@ -188,14 +179,7 @@ class OpenCVOpticalFlow(OTAlgorithm):
 
         return json.dumps(parms, indent=4)
 
-    def _to_displacements(self, meta: dict, pixel_offsets) -> tuple:
-
-        px, py = pixel_offsets.T
-        dxx, dyy = px.T * meta["transform"].a, py.T * -meta["transform"].e
-
-        return np.linalg.norm([dxx, dyy], axis=0)
-
-    def __call__(self, meta: dict, reference: np.ndarray, target: np.ndarray) -> np.ndarray:
+    def __call__(self, reference: Image, target: Image) -> Image:
         """
         Args:
             meta (dict): metadati degli array di input
@@ -206,25 +190,26 @@ class OpenCVOpticalFlow(OTAlgorithm):
             np.ndarray: spostamenti (frazioni di pixel)
         """
 
-        offsets = cv2.calcOpticalFlowFarneback(prev=reference, next=target,
-                                               flow=self.flow,
-                                               pyr_scale=self.pyr_scale,
-                                               levels=self.levels,
-                                               winsize=self.winsize,
-                                               iterations=self.iterations,
-                                               poly_n=self.poly_n,
-                                               poly_sigma=self.poly_sigma,
-                                               flags=self.flags)
+        pixel_offsets = cv2.calcOpticalFlowFarneback(prev=reference.image, next=target.image,
+                                                     flow=self.flow,
+                                                     pyr_scale=self.pyr_scale,
+                                                     levels=self.levels,
+                                                     winsize=self.winsize,
+                                                     iterations=self.iterations,
+                                                     poly_n=self.poly_n,
+                                                     poly_sigma=self.poly_sigma,
+                                                     flags=self.flags)
 
-        return self._to_displacements(meta, offsets)
+        displ = self._to_displacements(target.affine, pixel_offsets)
+
+        return Image(displ, target.affine, target.crs, target.nodata)
 
 
-class SkiOpticalFlowILV(OTAlgorithm):
-    def __init__(self, band: int | list[int] = 1, radius=7,
+class SkiOpticalFlowILK(OTAlgorithm):
+    def __init__(self, radius=7,
                  num_warp=10, gaussian=False, prefilter=False,
                  dtype=np.float32):
 
-        self.band = band
         self.radius = radius
         self.num_warp = num_warp
         self.gaussian = gaussian
@@ -249,13 +234,13 @@ class SkiOpticalFlowILV(OTAlgorithm):
         for key in keys:
             kw[key] = __d.get(key, None)
 
-        return SkiOpticalFlowILV(**kw)
+        return SkiOpticalFlowILK(**kw)
 
     @staticmethod
     def from_JSON(__json: Path | str):
         __d = json.loads(Path(__json).read_text())
 
-        return SkiOpticalFlowILV.from_dict(__d)
+        return SkiOpticalFlowILK.from_dict(__d)
 
     @staticmethod
     def from_YAML(__yaml: Path | str):
@@ -263,29 +248,25 @@ class SkiOpticalFlowILV(OTAlgorithm):
 
         __d = yaml.safe_load(Path(__yaml).read_text())
 
-        return SkiOpticalFlowILV.from_dict(__d)
+        return SkiOpticalFlowILK.from_dict(__d)
 
-    def _to_displacements(self, meta: dict, pixel_offsets) -> tuple:
-        px, py = pixel_offsets
-        dxx, dyy = px * meta["transform"].a, py * -meta["transform"].e
+    def __call__(self, reference: Image, target: Image) -> Image:
 
-        return np.linalg.norm([dxx, dyy], axis=0)
-
-    def __call__(self, meta: dict, reference: np.ndarray, target: np.ndarray) -> np.ndarray:
-
-        pixel_offsets = optical_flow_ilk(reference, target, radius=self.radius,
+        pixel_offsets = optical_flow_ilk(reference.image, target.image, radius=self.radius,
                                          num_warp=self.num_warp, gaussian=self.gaussian,
                                          prefilter=self.prefilter, dtype=self.dtype)
 
-        return self._to_displacements(meta, pixel_offsets)
+        a, b = pixel_offsets
+        displ = self._to_displacements(target.affine, cv2.merge([a, b]))
+
+        return Image(displ, target.affine, target.crs, target.nodata)
 
 
 class SkiOpticalFlowTVL1(OTAlgorithm):
-    def __init__(self, band=1, attachment=15, tightness=0.3,
+    def __init__(self, attachment=15, tightness=0.3,
                  num_warp=5, num_iter=10, tol=1e-4, prefilter=False,
                  dtype=np.float32):
 
-        self.band = band
         self.attachment = attachment
         self.tightness = tightness
         self.num_warp = num_warp
@@ -300,7 +281,7 @@ class SkiOpticalFlowTVL1(OTAlgorithm):
         restituisce un'istanza della classe estraendo da `__d` solo gli
         argomenti necessari.
         """
-        keys = [
+        keys = [  # perchè non ho messo 'band' ???
             "attachment",
             "tightness",
             "num_warp",
@@ -330,16 +311,10 @@ class SkiOpticalFlowTVL1(OTAlgorithm):
 
         return SkiOpticalFlowTVL1.from_dict(__d)
 
-    def _to_displacements(self, meta: dict, pixel_offsets) -> tuple:
-        px, py = pixel_offsets
-        dxx, dyy = px * meta["transform"].a, py * -meta["transform"].e
-
-        return np.linalg.norm([dxx, dyy], axis=0)
-
-    def __call__(self, meta: dict, reference: np.ndarray, target: np.ndarray) -> np.ndarray:
+    def __call__(self, reference: Image, target: Image) -> Image:
 
         pixel_offsets = optical_flow_tvl1(
-            reference, target,
+            reference.image, target.image,
             attachment=self.attachment,
             tightness=self.tightness,
             num_warp=self.num_warp,
@@ -348,72 +323,65 @@ class SkiOpticalFlowTVL1(OTAlgorithm):
             prefilter=self.prefilter,
             dtype=self.dtype)
 
-        return self._to_displacements(meta, pixel_offsets)
+        a, b = pixel_offsets
+        displ = self._to_displacements(target.affine, cv2.merge([a, b]))
+
+        return Image(displ, target.affine, target.crs, target.nodata)
 
 
-def process_image(image: np.ndarray, win_size: tuple, step_size: tuple) -> np.ndarray:
-    return stepped_rolling_window(image, win_size, step_size).reshape(-1, *win_size)
+class SkiPCC_Vector(OTAlgorithm):
+    def __init__(self, winsize: tuple[int] | int,
+                 step_size: tuple[int] | int,
+                 phase_norm: bool = True,
+                 upsmp_fac: int | float = 1.0):
 
+        if phase_norm:
+            self.normalization = 'phase'
+        else:
+            self.normalization = None
 
-def xcorr_to_geopandas(ref: Image, tar: Image,
-                       win_size: tuple[int] | int,
-                       step_size: tuple[int] | int,
-                       normalization: str | None = 'phase',
-                       upsample_factor: int | float = 1.0) -> gpd.GeoDataFrame:
-    """
-    Cross-correlazione di immagini. Di default, normalizza le immagini attraverso FFT,
-    (eseguendo una cross-correlazione di fase o PCC); assegnando `None` alla variabile
-    `normalization` si esegue una cross-correlazione NON normalizzata.
+        self.winsize = winsize
+        self.step_size = step_size
+        self.upsmp_fac = upsmp_fac
 
-    Arguments:
+    @staticmethod
+    def from_dict(__d: dict):
+        """
+        restituisce un'istanza della classe estraendo da `__d` solo gli
+        argomenti necessari.
+        """
+        keys = [
+            "winsize",
+            "step_size",
+            "phase_norm",
+            "upsmp_fac",
+        ]
 
-        ref, tar (Image): immagini di reference e target (geotiff)
-        win_size (tuple[int] | int): dimensione finestra mobile. Se è pari a un numero
-        intero (n), verrà assunta una finestra mobile quadrata (nxn)
-        step_size (tuple[int] | int): intervallo di campionamento. L'immagine verrà 
-        scomposta in tante finestre mobili centrate su punti dell'immagine distanziati di
-        `step_size` pixels.
-        normalization (str | None): tipo di normalizzazione, `phase` per PCC, `None` per
-        CC non normalizzata. Default = `phase`
-        upsample_factor (int | float): rapporto di sovracampionamento (?). Le immagini
-        verranno registrate con una dimensione dei pixel pari a `1 / upsample_factor`.
-        Utile per identificare spostamenti a scala di sub-pixel. Influenza molto il carico
-        di calcolo necessario.
+        kw = dict()
+        for key in keys:
+            kw[key] = __d.get(key, None)
 
-    Returns:
+        return SkiPCC_Vector(**kw)
 
-        (geopandas.GeoDataFrame): shapefile di output. Vengono memorizzati gli attributi di
-        spostamento risultante (L2) e spostamento lungo le righe (RSHIFT) e colonne (CSHIFT).
-        Tutti gli spostamenti sono espressi nell'unità di misura propria delle immagini di
-        partenza.
+    @staticmethod
+    def from_JSON(__json: Path | str):
+        __d = json.loads(Path(__json).read_text())
 
-    """
+        return SkiPCC_Vector.from_dict(__d)
 
-    if isinstance(win_size, int):
-        win_size = win_size, win_size
+    @staticmethod
+    def from_YAML(__yaml: Path | str):
+        import yaml
 
-    if isinstance(step_size, int):
-        step_size = step_size, step_size
+        __d = yaml.safe_load(Path(__yaml).read_text())
 
-    _ref = process_image(ref.image, win_size, step_size)
-    _tar = process_image(tar.image, win_size, step_size)
+        return SkiPCC_Vector.from_dict(__d)
 
-    i = np.arange(step_size[0], ref.image.shape[0], step_size[0]).astype(int)
-    j = np.arange(step_size[1], ref.image.shape[1], step_size[1]).astype(int)
-    index = np.array(list(product(i, j)))
+    def __call__(self, reference: Image, target: Image) -> gpd.GeoDataFrame | pd.DataFrame:
+        self.toJSON(self.__dict__)
 
-    offset_record = list()
-
-    for (e, r, t) in zip(index, _ref, _tar):
-        (sr, sc), _, _ = phase_cross_correlation(
-            r, t, normalization=normalization, upsample_factor=upsample_factor)
-        l2 = np.sqrt(sr**2 + sc**2)
-        offset_record.append(tuple([l2, float(sr), float(sc)]))
-
-    transfomer = AffineTransformer(ref.affine)
-    df = pd.DataFrame(offset_record, columns=[
-                      "L2", "RSHIFT", "CSHIFT"]) * ref.affine.a  # pixel -> metri
-    coords = np.c_[transfomer.xy(*index.T)]
-    geom = points_from_xy(*zip(*coords), crs=ref.crs.to_string())
-
-    return gpd.GeoDataFrame(df, geometry=geom)  # .to_file("corvara.shp")
+        return xcorr_to_geopandas(ref=reference, tar=target,
+                                  win_size=self.winsize,
+                                  step_size=self.step_size,
+                                  normalization=self.normalization,
+                                  upsample_factor=self.upsmp_fac)

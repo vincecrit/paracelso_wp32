@@ -6,8 +6,9 @@ from ot import algoritmi, interfaces
 @unique
 class AlgFactory(Enum):
     OPENCVOF = algoritmi.OpenCVOpticalFlow
-    SKIOFILV = algoritmi.SkiOpticalFlowILV
+    SKIOFILK = algoritmi.SkiOpticalFlowILK
     SKIOFTVL1 = algoritmi.SkiOpticalFlowTVL1
+    SKIPCCV = algoritmi.SkiPCC_Vector
 
 
 def get_algorithm(algname: str) -> interfaces.OTAlgorithm:

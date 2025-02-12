@@ -11,6 +11,7 @@ def basic_pixel_coregistration(infile: str, match: str, outfile: str) -> None:
     """
     with rasterio.open(infile) as src:
         src_transform = src.transform
+        nodata = src.meta['nodata']
 
         with rasterio.open(match) as match:
             dst_crs = match.crs
@@ -30,7 +31,7 @@ def basic_pixel_coregistration(infile: str, match: str, outfile: str) -> None:
                            "transform": dst_transform,
                            "width": dst_width,
                            "height": dst_height,
-                           "nodata": 0})
+                           "nodata": nodata})
 
         print("Coregistrato a dimensioni:", dst_height,
               dst_width, '\n Affine\n', dst_transform)

@@ -1,8 +1,74 @@
-import numpy as np
+from itertools import product
 
-__all__ = [
-    'normalize', 'powernorm', 'lognorm', 'rgb2single_band'
-]
+import cv2
+import numpy as np
+import rasterio
+from numpy.lib.stride_tricks import as_strided
+
+
+def stepped_rolling_window(array_2d: np.ndarray, win_size: tuple,
+                           step_size: tuple = (1, 1)) -> tuple[np.ndarray]:
+    """Applica una rolling window con passo su un array 2D.
+
+    Args:
+        array_2d (np.ndarray): Array 2D di input.
+        win_size (tuple): Dimensione della finestra (win_h, win_w).
+        step_size (tuple): Passo della finestra (step_h, step_w).
+        Di default è pari a `(1, 1)`.
+
+    Returns:
+        tuple[np.ndarray]: (1) indici del centro di ogni finestra mobile.
+        (2) Array 3D con viste delle finestre (n_rows*n_cols, win_h, win_w).
+    """
+    win_h, win_w = win_size
+    step_h, step_w = step_size
+    arr_h, arr_w = array_2d.shape
+
+    # Numero di finestre lungo ogni dimensione
+    out_shape = ((arr_h - win_h) // step_h + 1,
+                 (arr_w - win_w) // step_w + 1, win_h, win_w)
+
+    # Strided views
+    strides = (array_2d.strides[0] * step_h, array_2d.strides[1]
+               * step_w, array_2d.strides[0], array_2d.strides[1])
+
+    i = np.arange(step_size[0], array_2d.shape[0], step_size[0]).astype(int)
+    j = np.arange(step_size[1], array_2d.shape[1], step_size[1]).astype(int)
+
+    indexes = np.array(list(product(i, j)))
+
+    return indexes, as_strided(array_2d, shape=out_shape,
+                               strides=strides).reshape(-1, *win_size)
+
+
+def _to_CV8U(a: np.ndarray, cv2_norm_type: int = cv2.NORM_MINMAX) -> np.ndarray:
+    return cv2.normalize(a, alpha=0, beta=255, dst=None, norm_type=cv2_norm_type, dtype=cv2.CV_8U)
+
+
+def cv2_equalize_channels(array: np.ndarray) -> np.ndarray:
+    try:
+        *(rows, cols), channels = array.shape
+        print(rows, cols, channels)
+
+    except ValueError:
+        print('non ha 3 canali')
+        return cv2_equalize_channels(array.reshape(*array.shape, 1))
+
+    eq = list()
+    for channel in range(channels):
+        eq.append(cv2.equalizeHist(array[..., channel]))
+
+    return cv2.merge(eq)
+
+
+def rasterio_to_CV2_8U(source: str):
+    with rasterio.open(source) as src:
+        print(src.meta)
+        bands = []
+        for b in range(src.count):
+            bands.append(_to_CV8U(src.read(b + 1)))
+
+        return cv2.merge(bands)
 
 
 def std_norm(arraylike: np.ndarray) -> np.ndarray:
@@ -10,27 +76,6 @@ def std_norm(arraylike: np.ndarray) -> np.ndarray:
     Normalizza i valori dell'array sottraendo la media e dividendo per la deviazione standard.
     """
     return (arraylike - np.mean(arraylike))/np.std(arraylike)
-
-
-def normalize(arraylike: np.ndarray) -> np.ndarray:
-    """
-    Normalizza i valori dell'array in un range tra 0 e 1.
-    
-    Argomenti:
-    arraylike (np.ndarray): input array da normalizzare.
-
-    Returns:
-    np.ndarray: array normalizzato con valori nell'intervallo [0, 1].
-    """
-
-    return (arraylike - np.min(arraylike))/(np.max(arraylike) - np.min(arraylike))
-
-
-def to_uint8(floatarray: np.ndarray) -> np.ndarray:
-    """
-    Converte un array di float in un array di interi unsigned 8-bit.
-    """
-    return (floatarray*255).astype('uint8')
 
 
 def powernorm(arr: np.ndarray, gamma: float = 1.0) -> np.ndarray:
@@ -54,39 +99,29 @@ def powernorm(arr: np.ndarray, gamma: float = 1.0) -> np.ndarray:
     return normalized ** gamma
 
 
-def lognorm(arr):
-    """
-    Normalizza un array applicando una trasformazione logaritmica.
-
-    Parameters:
-    arr (array-like): L'array di input da normalizzare.
-
-    Returns:
-    np.ndarray: L'array normalizzato.
-    """
-    # arr = np.asarray(arr, dtype=np.float64)
-    min_val = arr.min()
-
-    if min_val <= 0:
-        arr = arr - min_val + 1  # Shift per evitare log(0) o valori negativi
-
-    return np.log1p(arr - arr.min()) / np.log1p(arr.max() - arr.min())
+def _normalize_band(band, mask=None, nodata: int | float | None = np.nan):
+    if mask is None:
+        mask = np.zeros_like(band).astype(bool)
+    valid_pixels = band[~mask]
+    min_val, max_val = np.min(valid_pixels), np.max(valid_pixels)
+    normalized = (band - min_val) / (max_val - min_val)
+    normalized[mask] = nodata  # Mantieni NoData
+    return normalized
 
 
-def rgb2single_band(image: np.ndarray):
-    '''
-    Converte un'immagine RGB in scala di grigi utilizzando la formula:
+def _zscore_band(band, mask=None, nodata: int | float | None = np.nan):
+    if mask is None:
+        mask = np.zeros_like(band).astype(bool)
+    valid_pixels = band[~mask]
+    mean, std = np.mean(valid_pixels), np.std(valid_pixels)
+    normalized = (band - mean) / std
+    normalized[mask] = nodata
+    return normalized
 
-    Y709 = 0.2125*R + 0.7154*G + 0.0721*B
-    '''
-    if not image.ndim == 3:
-        raise ValueError("Input image must be a 3D array")
 
-    R, G, B = 0.21250, 0.71540, 0.07210
-    b1, b2, b3 = image
-
-    b1 *= R
-    b2 *= G
-    b3 *= B
-
-    return b1 + b2 + b3
+def _log_band(band, mask=None, epsilon=1e-5, nodata: int | float | None = np.nan):
+    if mask is None:
+        mask = np.zeros_like(band).astype(bool)
+    normalized = np.log(band + epsilon)
+    normalized[mask] = nodata
+    return normalized

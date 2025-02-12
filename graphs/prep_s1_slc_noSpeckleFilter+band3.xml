@@ -92,11 +92,11 @@
     </parameters>
   </node>
   <node id="bandMathsNode">
-  <operator>BandMaths</operator>
-  <sources>
+    <operator>BandMaths</operator>
+    <sources>
       <sourceProduct refid="TerrainCorrection"/>
-  </sources>
-  <parameters>
+    </sources>
+    <parameters>
       <targetBands>
           <targetBand>
               <name>Sigma0_VH</name>
@@ -120,12 +120,21 @@
               <spectralBandIndex>3</spectralBandIndex>
           </targetBand>
       </targetBands>
-  </parameters>
-</node>
+    </parameters>
+  </node>
+  <node id="SetNoDataValue">
+    <operator>SetNoDataValue</operator>
+    <sources>
+      <sourceProduct refid="bandMathsNode"/>
+    </sources>
+    <parameters>
+      <noDataValue>-9999</noDataValue>
+    </parameters>
+  </node>
   <node id="Write">
     <operator>Write</operator>
     <sources>
-      <sourceProduct refid="TerrainCorrection"/>
+      <sourceProduct refid="SetNoDataValue"/>
     </sources>
     <parameters class="com.bc.ceres.binding.dom.XppDomElement">
       <file>${o}</file>
