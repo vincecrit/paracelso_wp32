@@ -1,3 +1,29 @@
+"""
+This module provides various functions for normalizing and transforming 2D arrays and image data. 
+It includes utilities for applying rolling windows, converting arrays to 8-bit unsigned integers, 
+equalizing histograms of image channels, and performing different types of normalization such as 
+standard normalization, power transformation, and z-score normalization. Additionally, it offers 
+functions to handle raster data using the rasterio library.
+Functions:
+- stepped_rolling_window(array_2d: np.ndarray, win_size: tuple, step_size: tuple = (1, 1)) -> tuple[np.ndarray]:
+    Apply a rolling window with step size on a 2D array.
+- _to_CV8U(a: np.ndarray, cv2_norm_type: int = cv2.NORM_MINMAX) -> np.ndarray:
+    Convert an array to 8-bit unsigned integer using OpenCV normalization.
+- cv2_equalize_channels(array: np.ndarray) -> np.ndarray:
+    Equalize the histogram of each channel in an array using OpenCV.
+- rasterio_to_CV2_8U(source: str):
+    Convert a rasterio image to an 8-bit unsigned integer image using OpenCV.
+- std_norm(arraylike: np.ndarray) -> np.ndarray:
+    Normalize the values of an array by subtracting the mean and dividing by the standard deviation.
+- powernorm(arr: np.ndarray, gamma: float = 1.0) -> np.ndarray:
+    Normalize an array by applying a power transformation.
+- _normalize_band(band, mask=None, nodata: int | float | None = np.nan):
+    Normalize a band by its minimum and maximum values, maintaining NoData values.
+- _zscore_band(band, mask=None, nodata: int | float | None = np.nan):
+    Normalize a band using z-score normalization, maintaining NoData values.
+- _log_band(band, mask=None, epsilon=1e-5, nodata: int | float | None = np.nan):
+    Normalize a band using logarithmic transformation, maintaining NoData values.
+"""
 from itertools import product
 
 import cv2
@@ -8,7 +34,7 @@ from numpy.lib.stride_tricks import as_strided
 
 def stepped_rolling_window(array_2d: np.ndarray, win_size: tuple,
                            step_size: tuple = (1, 1)) -> tuple[np.ndarray]:
-    """Applica una rolling window con passo su un array 2D.
+    """Apply a rolling window with step size on a 2D array.
 
     Args:
         array_2d (np.ndarray): Array 2D di input.
@@ -42,10 +68,12 @@ def stepped_rolling_window(array_2d: np.ndarray, win_size: tuple,
 
 
 def _to_CV8U(a: np.ndarray, cv2_norm_type: int = cv2.NORM_MINMAX) -> np.ndarray:
+    """Convert an array to 8-bit unsigned integer using OpenCV normalization."""
     return cv2.normalize(a, alpha=0, beta=255, dst=None, norm_type=cv2_norm_type, dtype=cv2.CV_8U)
 
 
 def cv2_equalize_channels(array: np.ndarray) -> np.ndarray:
+    """Equalize the histogram of each channel in an array using OpenCV."""
     try:
         *(rows, cols), channels = array.shape
         print(rows, cols, channels)
@@ -62,6 +90,7 @@ def cv2_equalize_channels(array: np.ndarray) -> np.ndarray:
 
 
 def rasterio_to_CV2_8U(source: str):
+    """Convert a rasterio image to an 8-bit unsigned integer image using OpenCV."""
     with rasterio.open(source) as src:
         print(src.meta)
         bands = []
@@ -72,15 +101,12 @@ def rasterio_to_CV2_8U(source: str):
 
 
 def std_norm(arraylike: np.ndarray) -> np.ndarray:
-    """
-    Normalizza i valori dell'array sottraendo la media e dividendo per la deviazione standard.
-    """
+    """Normalize the values of an array by subtracting the mean and dividing by the standard deviation."""
     return (arraylike - np.mean(arraylike))/np.std(arraylike)
 
 
 def powernorm(arr: np.ndarray, gamma: float = 1.0) -> np.ndarray:
-    """
-    Normalizza un array applicando una trasformazione di potenza.
+    """Normalize an array by applying a power transformation.
 
     Parameters:
     arr (array-like): L'array di input da normalizzare.
@@ -100,6 +126,7 @@ def powernorm(arr: np.ndarray, gamma: float = 1.0) -> np.ndarray:
 
 
 def _normalize_band(band, mask=None, nodata: int | float | None = np.nan):
+    """Normalize a band by its minimum and maximum values, maintaining NoData values."""
     if mask is None:
         mask = np.zeros_like(band).astype(bool)
     valid_pixels = band[~mask]
@@ -110,6 +137,7 @@ def _normalize_band(band, mask=None, nodata: int | float | None = np.nan):
 
 
 def _zscore_band(band, mask=None, nodata: int | float | None = np.nan):
+    """Normalize a band using z-score normalization, maintaining NoData values."""
     if mask is None:
         mask = np.zeros_like(band).astype(bool)
     valid_pixels = band[~mask]
@@ -120,8 +148,24 @@ def _zscore_band(band, mask=None, nodata: int | float | None = np.nan):
 
 
 def _log_band(band, mask=None, epsilon=1e-5, nodata: int | float | None = np.nan):
+    """Normalize a band using logarithmic transformation, maintaining NoData values."""
     if mask is None:
         mask = np.zeros_like(band).astype(bool)
     normalized = np.log(band + epsilon)
     normalized[mask] = nodata
     return normalized
+
+
+def _clahe(band, clip_limit: float = 2., kernel_size: int | tuple[int] = (3, 3),
+           mask=None, nodata: int | float | None = np.nan):
+    """Contrast limited adaptive histogram equalization"""
+    if mask is None:
+        mask = np.zeros_like(band).astype(bool)
+    
+    if isinstance(kernel_size, int):
+        kernel_size = kernel_size, kernel_size
+        
+    clahe = cv2.createCLAHE(clipLimit=clip_limit, tileGridSize=kernel_size)
+    clahe_band = clahe.apply(band)
+    clahe_band[mask] = nodata
+    return clahe_band

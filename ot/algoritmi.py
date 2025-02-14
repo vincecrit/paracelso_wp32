@@ -1,3 +1,14 @@
+"""
+Modulo per l'elaborazione di immagini e la registrazione tramite tecniche di optical flow e cross-correlazione di fase.
+Questo modulo contiene diverse classi e funzioni per calcolare il flusso ottico tra immagini e per eseguire la cross-correlazione di fase tra immagini di riferimento e target. Le classi forniscono un'interfaccia per utilizzare le funzioni di optical flow di OpenCV e scikit-image, mentre le funzioni permettono di convertire i risultati in formati utilizzabili come GeoDataFrame di geopandas o DataFrame di pandas.
+Classi:
+    - OpenCVOpticalFlow: Wrap-up per la funzione `calcOpticalFlowFarneback` di OpenCV.
+    - SkiOpticalFlowILK: Wrapper per la funzione `optical_flow_ilk` di scikit-image.
+    - SkiOpticalFlowTVL1: Wrapper per la funzione `optical_flow_tvl1` di scikit-image.
+    - SkiPCC_Vector: Wrapper per il calcolo del vettore di cross-correlazione di fase.
+Funzioni:
+    - xcorr_to_geopandas: Esegue la cross-correlazione di immagini e restituisce un GeoDataFrame o DataFrame con i risultati.
+"""
 import json
 from enum import Enum, unique
 from pathlib import Path
@@ -10,8 +21,9 @@ from geopandas import points_from_xy
 from rasterio.transform import AffineTransformer
 from skimage.registration import (optical_flow_ilk, optical_flow_tvl1,
                                   phase_cross_correlation)
+from tqdm import tqdm
 
-from ot.interfaces import OTAlgorithm, Image
+from ot.interfaces import Image, OTAlgorithm
 from ot.normalize import stepped_rolling_window
 
 
@@ -62,7 +74,7 @@ def xcorr_to_geopandas(ref: Image, tar: Image,
     _, _tar = stepped_rolling_window(tar.image, win_size, step_size)
 
     offset_record = list()
-    for (r, t) in zip(_ref, _tar):
+    for (r, t) in tqdm(iterable=zip(_ref, _tar), desc=f"IMGCORR", total=index.shape[0], ncols=150):
         (sr, sc), _, _ = phase_cross_correlation(r, t,
                                                  normalization=normalization,
                                                  upsample_factor=upsample_factor)
@@ -91,6 +103,7 @@ def xcorr_to_geopandas(ref: Image, tar: Image,
 
 @unique
 class OPTFLOW_Flags(Enum):
+    """Flags for OpenCV optical flow."""
     OPTFLOW_DEFAULT = None
     OPTFLOW_USE_INITIAL_FLOW = 4  # cv2.OPTFLOW_USE_INITIAL_FLOW
     OPTFLOW_FARNEBACK_GAUSSIAN = 256  # cv2.OPTFLOW_FARNEBACK_GAUSSIAN
@@ -157,12 +170,14 @@ class OpenCVOpticalFlow(OTAlgorithm):
 
     @staticmethod
     def from_JSON(__json: Path | str):
+        """Create an instance from a JSON file."""
         __d = json.loads(Path(__json).read_text())
 
         return OpenCVOpticalFlow.from_dict(__d)
 
     @staticmethod
     def from_YAML(__yaml: Path | str):
+        """Create an instance from a YAML file."""
         import yaml
 
         __d = yaml.safe_load(Path(__yaml).read_text())
@@ -170,7 +185,7 @@ class OpenCVOpticalFlow(OTAlgorithm):
         return OpenCVOpticalFlow.from_dict(__d)
 
     def toJSON(self):
-
+        """Convert the instance to a JSON string."""
         try:
             parms = self.__dict__
             parms['flags'] = self.flags.value
@@ -180,16 +195,7 @@ class OpenCVOpticalFlow(OTAlgorithm):
         return json.dumps(parms, indent=4)
 
     def __call__(self, reference: Image, target: Image) -> Image:
-        """
-        Args:
-            meta (dict): metadati degli array di input
-            reference (np.ndarray): first 8-bit single-channel input image.
-            target (np.ndarray): second input image of the same size and the same type as `reference`
-
-        Returns:
-            np.ndarray: spostamenti (frazioni di pixel)
-        """
-
+        """Calculate optical flow between reference and target images."""
         pixel_offsets = cv2.calcOpticalFlowFarneback(prev=reference.image, next=target.image,
                                                      flow=self.flow,
                                                      pyr_scale=self.pyr_scale,
@@ -206,6 +212,8 @@ class OpenCVOpticalFlow(OTAlgorithm):
 
 
 class SkiOpticalFlowILK(OTAlgorithm):
+    """Wrapper for scikit-image's optical_flow_ilk function."""
+
     def __init__(self, radius=7,
                  num_warp=10, gaussian=False, prefilter=False,
                  dtype=np.float32):
@@ -218,10 +226,7 @@ class SkiOpticalFlowILK(OTAlgorithm):
 
     @staticmethod
     def from_dict(__d: dict):
-        """
-        restituisce un'istanza della classe estraendo da `__d` solo gli
-        argomenti necessari.
-        """
+        """Create an instance from a dictionary."""
         keys = [
             "radius",
             "num_warp",
@@ -238,12 +243,14 @@ class SkiOpticalFlowILK(OTAlgorithm):
 
     @staticmethod
     def from_JSON(__json: Path | str):
+        """Create an instance from a JSON file."""
         __d = json.loads(Path(__json).read_text())
 
         return SkiOpticalFlowILK.from_dict(__d)
 
     @staticmethod
     def from_YAML(__yaml: Path | str):
+        """Create an instance from a YAML file."""
         import yaml
 
         __d = yaml.safe_load(Path(__yaml).read_text())
@@ -251,7 +258,7 @@ class SkiOpticalFlowILK(OTAlgorithm):
         return SkiOpticalFlowILK.from_dict(__d)
 
     def __call__(self, reference: Image, target: Image) -> Image:
-
+        """Calculate optical flow between reference and target images using ILK method."""
         pixel_offsets = optical_flow_ilk(reference.image, target.image, radius=self.radius,
                                          num_warp=self.num_warp, gaussian=self.gaussian,
                                          prefilter=self.prefilter, dtype=self.dtype)
@@ -263,6 +270,8 @@ class SkiOpticalFlowILK(OTAlgorithm):
 
 
 class SkiOpticalFlowTVL1(OTAlgorithm):
+    """Wrapper for scikit-image's optical_flow_tvl1 function."""
+
     def __init__(self, attachment=15, tightness=0.3,
                  num_warp=5, num_iter=10, tol=1e-4, prefilter=False,
                  dtype=np.float32):
@@ -277,10 +286,7 @@ class SkiOpticalFlowTVL1(OTAlgorithm):
 
     @staticmethod
     def from_dict(__d: dict):
-        """
-        restituisce un'istanza della classe estraendo da `__d` solo gli
-        argomenti necessari.
-        """
+        """Create an instance from a dictionary."""
         keys = [  # perchè non ho messo 'band' ???
             "attachment",
             "tightness",
@@ -299,12 +305,14 @@ class SkiOpticalFlowTVL1(OTAlgorithm):
 
     @staticmethod
     def from_JSON(__json: Path | str):
+        """Create an instance from a JSON file."""
         __d = json.loads(Path(__json).read_text())
 
         return SkiOpticalFlowTVL1.from_dict(__d)
 
     @staticmethod
     def from_YAML(__yaml: Path | str):
+        """Create an instance from a YAML file."""
         import yaml
 
         __d = yaml.safe_load(Path(__yaml).read_text())
@@ -312,7 +320,7 @@ class SkiOpticalFlowTVL1(OTAlgorithm):
         return SkiOpticalFlowTVL1.from_dict(__d)
 
     def __call__(self, reference: Image, target: Image) -> Image:
-
+        """Calculate optical flow between reference and target images using TVL1 method."""
         pixel_offsets = optical_flow_tvl1(
             reference.image, target.image,
             attachment=self.attachment,
@@ -330,6 +338,8 @@ class SkiOpticalFlowTVL1(OTAlgorithm):
 
 
 class SkiPCC_Vector(OTAlgorithm):
+    """Wrapper for phase cross-correlation vector calculation."""
+
     def __init__(self, winsize: tuple[int] | int,
                  step_size: tuple[int] | int,
                  phase_norm: bool = True,
@@ -346,10 +356,7 @@ class SkiPCC_Vector(OTAlgorithm):
 
     @staticmethod
     def from_dict(__d: dict):
-        """
-        restituisce un'istanza della classe estraendo da `__d` solo gli
-        argomenti necessari.
-        """
+        """Create an instance from a dictionary."""
         keys = [
             "winsize",
             "step_size",
@@ -365,12 +372,14 @@ class SkiPCC_Vector(OTAlgorithm):
 
     @staticmethod
     def from_JSON(__json: Path | str):
+        """Create an instance from a JSON file."""
         __d = json.loads(Path(__json).read_text())
 
         return SkiPCC_Vector.from_dict(__d)
 
     @staticmethod
     def from_YAML(__yaml: Path | str):
+        """Create an instance from a YAML file."""
         import yaml
 
         __d = yaml.safe_load(Path(__yaml).read_text())
@@ -378,6 +387,7 @@ class SkiPCC_Vector(OTAlgorithm):
         return SkiPCC_Vector.from_dict(__d)
 
     def __call__(self, reference: Image, target: Image) -> gpd.GeoDataFrame | pd.DataFrame:
+        """Calculate phase cross-correlation between reference and target images."""
         self.toJSON(self.__dict__)
 
         return xcorr_to_geopandas(ref=reference, tar=target,

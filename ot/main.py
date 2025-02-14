@@ -6,15 +6,15 @@ import geopandas as gpd
 from ot.coreg import basic_pixel_coregistration
 from ot.helpmsg import (ALGNAME, ATTACHMENT, BAND, FLAGS, FLOW, GAUSSIAN,
                         ITERATIONS, LEVELS, LOGNORM, MINMAX, NODATA, NORMALIZE,
-                        NUMITER, NUMWARP, OUTPUT, POLY_N, POLY_SIGMA,
+                        NUMITER, NUMWARP, OUTPUT, POLY_N, POLY_SIGMA, CLAHE,
                         PREFILTER, PYR_SCALE, RADIUS, REFERENCE, TARGET, UPSAMPLE_FACTOR,
                         TIGHTNESS, TOL, WINSIZE, ZSCORENORM, STEPSIZE, PHASENORM)
 from ot.interfaces import Image, OTAlgorithm
 from ot.metodi import get_algorithm
 
 
-def get_parser() -> argparse.ArgumentParser:
-
+def _get_parser() -> argparse.ArgumentParser:
+    """Get the argument parser for the script."""
     parser = argparse.ArgumentParser(description="Optical flow")
     # parametri comuni
     parser.add_argument("-ot", "--algname", help=ALGNAME, type=str)
@@ -29,9 +29,11 @@ def get_parser() -> argparse.ArgumentParser:
     parser.add_argument("--normalize", help=NORMALIZE,
                         default=False, action="store_true")
     parser.add_argument("--zscore", help=ZSCORENORM,
-                        default=None, action="store_true")
+                        default=False, action="store_true")
     parser.add_argument("--minmax", help=MINMAX,
-                        default=None, action="store_true")
+                        default=False, action="store_true")
+    parser.add_argument("--clahe", help=CLAHE,
+                        default=False, action="store_true")
     # parametri OpenCV
     parser.add_argument("--flow", help=FLOW, default=False)
     parser.add_argument("--levels", help=LEVELS, default=4, type=int)
@@ -59,7 +61,9 @@ def get_parser() -> argparse.ArgumentParser:
 
 
 def main() -> None:
-    args = get_parser().parse_args()
+
+    args = _get_parser().parse_args()
+
     algorithm = get_algorithm(args.algname)
     OTMethod: OTAlgorithm = algorithm.from_dict(vars(args))
 
@@ -81,7 +85,7 @@ def main() -> None:
         reference = reference.zscore_norm()
         target = target.zscore_norm()
 
-    elif args.minmax: # se zscore è True, prevale powernorm
+    elif args.minmax: # se zscore è True, prevale zscore
         reference = reference.minmax_norm()
         target = target.minmax_norm()
 

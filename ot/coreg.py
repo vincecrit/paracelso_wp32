@@ -1,14 +1,13 @@
+'''
+Modulo (una funzione) per coregistrazione di immagini
+'''
 import rasterio
 from rasterio.warp import Resampling, calculate_default_transform, reproject
 
 
 def basic_pixel_coregistration(infile: str, match: str, outfile: str) -> None:
-    """
-    Allineamento pixel tra un'immagine target (infile) e un'immagine di reference
-    (match). Eventualmente, riproietta sullo stesso CRS di 'match'
-
-    NON RESTITUISCE UN ARRAY MA SCRIVE DIRETTAMENTE IL RASTER COREGISTRATO
-    """
+    """Align pixels between a target image (infile) and a reference image (match).
+    Optionally, reproject to the same CRS as 'match'."""
     with rasterio.open(infile) as src:
         src_transform = src.transform
         nodata = src.meta['nodata']

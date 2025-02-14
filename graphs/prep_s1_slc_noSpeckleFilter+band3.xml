@@ -91,7 +91,7 @@
       <applyRadiometricNormalization>false</applyRadiometricNormalization>
     </parameters>
   </node>
-  <node id="bandMathsNode">
+  <node id="CalcBands">
     <operator>BandMaths</operator>
     <sources>
       <sourceProduct refid="TerrainCorrection"/>
@@ -102,27 +102,27 @@
               <name>Sigma0_VH</name>
               <expression>Sigma0_VH</expression>
               <type>float32</type>
-              <noDataValue>-9999</noDataValue>
+              <noDataValue>NaN</noDataValue>
               <spectralBandIndex>1</spectralBandIndex>
           </targetBand>
           <targetBand>
               <name>Sigma0_VV</name>
               <expression>Sigma0_VV</expression>
               <type>float32</type>
-              <noDataValue>-9999</noDataValue>
+              <!-- <noDataValue>-9999</noDataValue> -->
               <spectralBandIndex>2</spectralBandIndex>
           </targetBand>
           <targetBand>
               <name>Sigma0_VV/Sigma0_VH</name>
               <expression>Sigma0_VV/Sigma0_VH</expression>
               <type>float32</type>
-              <noDataValue>-9999</noDataValue>
+              <!-- <noDataValue>-9999</noDataValue> -->
               <spectralBandIndex>3</spectralBandIndex>
           </targetBand>
       </targetBands>
     </parameters>
   </node>
-  <node id="SetNoDataValue">
+  <!-- <node id="SetNoDataValue">
     <operator>SetNoDataValue</operator>
     <sources>
       <sourceProduct refid="bandMathsNode"/>
@@ -130,11 +130,11 @@
     <parameters>
       <noDataValue>-9999</noDataValue>
     </parameters>
-  </node>
+  </node> -->
   <node id="Write">
     <operator>Write</operator>
     <sources>
-      <sourceProduct refid="SetNoDataValue"/>
+      <sourceProduct refid="CalcBands"/>
     </sources>
     <parameters class="com.bc.ceres.binding.dom.XppDomElement">
       <file>${o}</file>
