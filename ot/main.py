@@ -13,7 +13,7 @@ from ot.interfaces import Image, OTAlgorithm
 from ot.metodi import get_algorithm
 
 
-def _get_parser() -> argparse.ArgumentParser:
+def get_parser() -> argparse.ArgumentParser:
     """Get the argument parser for the script."""
     parser = argparse.ArgumentParser(description="Optical flow")
     # parametri comuni
@@ -29,11 +29,11 @@ def _get_parser() -> argparse.ArgumentParser:
     parser.add_argument("--normalize", help=NORMALIZE,
                         default=False, action="store_true")
     parser.add_argument("--zscore", help=ZSCORENORM,
-                        default=False, action="store_true")
+                        default=None, action="store_true")
     parser.add_argument("--minmax", help=MINMAX,
-                        default=False, action="store_true")
+                        default=None, action="store_true")
     parser.add_argument("--clahe", help=CLAHE,
-                        default=False, action="store_true")
+                        default=None, action="store_true")
     # parametri OpenCV
     parser.add_argument("--flow", help=FLOW, default=False)
     parser.add_argument("--levels", help=LEVELS, default=4, type=int)
@@ -61,9 +61,8 @@ def _get_parser() -> argparse.ArgumentParser:
 
 
 def main() -> None:
-
-    args = _get_parser().parse_args()
-
+    """Main function to execute the optical flow algorithm."""
+    args = get_parser().parse_args()
     algorithm = get_algorithm(args.algname)
     OTMethod: OTAlgorithm = algorithm.from_dict(vars(args))
 
@@ -87,6 +86,10 @@ def main() -> None:
 
     elif args.minmax: # se zscore è True, prevale zscore
         reference = reference.minmax_norm()
+        target = target.minmax_norm()
+
+    elif args.clahe: # se zscore è True, prevale zscore
+        reference = reference.cla()
         target = target.minmax_norm()
 
     # OFFSET TRACKING

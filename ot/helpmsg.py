@@ -13,7 +13,7 @@ RGB2GRAY = '''Converte le immagini RGB in scala di grigi (banda singola)'''
 LOGNORM = '''Normalizza i logaritmi delle immagini. Ha la precedenza su
 '--normalize' e '--powernorm'''
 MINMAX = '''Normalizza le singole bande nel range 0 - 1 rispetto ai valori minimo e massimo'''
-CLAHE = '''Applica un algoritmo CLAHE ad ogni banda dell'immmagine'''
+CLAHE = '''Normalizza le singole bande attraverso un algoritmo CLAHE (Contrast Limited Adaptive Histogram Equalization)'''
 NORMALIZE = '''Normalizza le immagini rispetto ai valori minimi e massimi'''
 ZSCORENORM = '''Normalizza le immagini con potenza. Indica il parametro gamma'''
 FLOW = '''Guess iniziale di flusso. Richiede l'argomento '--flags' impostato

@@ -1,15 +1,8 @@
 __pycache__
 other
 cds
-*optional*
-eoreader*.py
-conda*.txt
-deactivate.bat
-activate.bat
 wp32
 output
 scripts_notebook
-note.md
-simple_ot.bat
-corvara.bat
 *.json
+*.bat

@@ -13,8 +13,6 @@ Functions:
     Equalize the histogram of each channel in an array using OpenCV.
 - rasterio_to_CV2_8U(source: str):
     Convert a rasterio image to an 8-bit unsigned integer image using OpenCV.
-- std_norm(arraylike: np.ndarray) -> np.ndarray:
-    Normalize the values of an array by subtracting the mean and dividing by the standard deviation.
 - powernorm(arr: np.ndarray, gamma: float = 1.0) -> np.ndarray:
     Normalize an array by applying a power transformation.
 - _normalize_band(band, mask=None, nodata: int | float | None = np.nan):
@@ -23,6 +21,8 @@ Functions:
     Normalize a band using z-score normalization, maintaining NoData values.
 - _log_band(band, mask=None, epsilon=1e-5, nodata: int | float | None = np.nan):
     Normalize a band using logarithmic transformation, maintaining NoData values.
+- _clahe(band, clip_limit: float = 2., kernel_size: int | tuple[int] = 3, mask=None, nodata: int | float | None = np.nan):
+    Apply Contrast Limited Adaptive Histogram Equalization (CLAHE) to a band, maintaining NoData values.
 """
 from itertools import product
 
@@ -100,12 +100,7 @@ def rasterio_to_CV2_8U(source: str):
         return cv2.merge(bands)
 
 
-def std_norm(arraylike: np.ndarray) -> np.ndarray:
-    """Normalize the values of an array by subtracting the mean and dividing by the standard deviation."""
-    return (arraylike - np.mean(arraylike))/np.std(arraylike)
-
-
-def powernorm(arr: np.ndarray, gamma: float = 1.0) -> np.ndarray:
+def powernorm(band: np.ndarray, gamma: float = 1.0, mask=None, nodata: int | float | None = np.nan) -> np.ndarray:
     """Normalize an array by applying a power transformation.
 
     Parameters:
@@ -115,14 +110,17 @@ def powernorm(arr: np.ndarray, gamma: float = 1.0) -> np.ndarray:
     Returns:
     np.ndarray: L'array normalizzato.
     """
-    # arr = np.asarray(arr, dtype=np.float32)
-    min_val, max_val = arr.min(), arr.max()
+    if mask is None:
+        mask = np.zeros_like(band).astype(bool)
+    min_val, max_val = band.min(), band.max()
 
     if max_val == min_val:
-        return np.zeros_like(arr)
+        return np.zeros_like(band)
 
-    normalized = (arr - min_val) / (max_val - min_val)
-    return normalized ** gamma
+    normalized = (band - min_val) / (max_val - min_val)
+    normalized = normalized ** gamma
+    normalized[mask] = nodata  # Mantieni NoData
+    return normalized
 
 
 def _normalize_band(band, mask=None, nodata: int | float | None = np.nan):
@@ -156,7 +154,7 @@ def _log_band(band, mask=None, epsilon=1e-5, nodata: int | float | None = np.nan
     return normalized
 
 
-def _clahe(band, clip_limit: float = 2., kernel_size: int | tuple[int] = (3, 3),
+def _clahe(band, clip_limit: float = 2., kernel_size: int | tuple[int] = 3,
            mask=None, nodata: int | float | None = np.nan):
     """Contrast limited adaptive histogram equalization"""
     if mask is None:

@@ -24,7 +24,7 @@ from skimage.registration import (optical_flow_ilk, optical_flow_tvl1,
 from tqdm import tqdm
 
 from ot.interfaces import Image, OTAlgorithm
-from ot.normalize import stepped_rolling_window
+from ot.image_processing import stepped_rolling_window
 
 
 def xcorr_to_geopandas(ref: Image, tar: Image,

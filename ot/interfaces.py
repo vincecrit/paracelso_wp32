@@ -10,8 +10,10 @@ Functions:
     - Image.__new__: Create a new instance of Image.
     - Image.__repr__: Return a string representation of the Image instance.
     - Image.__len__: Return the number of bands in the image.
-    - Image.__iter__: Return an iterator over the band names.
-    - Image.__getitem__: Get a specific band by name.
+    - Image.__iter__: Return an iterator over the band arrays.
+    - Image.__getitem__: Get a specific band by index.
+    - Image.__get_bandnames: Returns a tuple of band names.
+    - Image.bandnames: Get a tuple of the band names.
     - Image.from_file: Create an Image instance from a file.
     - Image.split_channels: Split the image into its individual channels.
     - Image.is_coregistered: Check if the image is coregistered with another image.
@@ -42,15 +44,7 @@ import numpy as np
 import rasterio
 from rasterio import CRS, Affine
 
-from ot.normalize import _log_band, _normalize_band, _zscore_band, _clahe
-
-
-@unique
-class Band(Enum):
-    """Enumeration for image bands."""
-    Red: int = 0
-    Green: int = 1
-    Blue: int = 2
+from ot.image_processing import _log_band, _normalize_band, _zscore_band
 
 
 class Image:
@@ -71,8 +65,10 @@ class Image:
         :param nodata: The nodata value.
         """
         self.image = image
+        splitted = cv2.split(image)
+        self.bandnames = self.__get_bandnames(len(splitted))
 
-        for bandname, band_array in zip(list(Band.__members__.keys()), cv2.split(image)):
+        for bandname, band_array in zip(self.bandnames, splitted):
             setattr(self, bandname, band_array)
 
         self.affine = affine
@@ -89,8 +85,17 @@ class Image:
 
     def __repr__(self): return f"{self.image}\n{self.affine}\n{self.crs}"
     def __len__(self): return self.count
-    def __iter__(self): return iter(list(Band.__members__.keys()))
-    def __getitem__(self, key): return self.__getattribute__(key)
+    
+    def __iter__(self):
+        for band in self.bandnames:
+            yield self.__getattribute__(band)
+        
+    def __getitem__(self, __index):
+        name = list(self.bandnames)[__index]
+        return self.__getattribute__(name)
+    
+    @classmethod
+    def __get_bandnames(n): return tuple(f"B{i+1}" for i in range(n))
 
     @property
     def nodata(self): return self._nodata
@@ -146,8 +151,8 @@ class Image:
             with rasterio.open(str(source)) as src:
                 bands = list()
 
-                for bandname, bandnum in zip(list(Band.__members__.keys()),
-                                             range(1, src.meta["count"] + 1)):
+                bandsindex = tuple(range(1, src.meta["count"] + 1))
+                for bandname, bandnum in zip(cls.__get_bandnames(len(bandsindex)), bandsindex):
                     band_array = src.read(bandnum)
                     setattr(cls, bandname, band_array)
                     bands.append(band_array)
@@ -160,8 +165,8 @@ class Image:
         elif suffix in ['.jpg', '.jpeg', '.png']:
             image = cv2.imread(str(source), cv2.IMREAD_COLOR)
 
-            for bandname, bandnum in zip(list(Band.__members__.keys()),
-                                         range(image.shape[-1])):
+            bandsindex = tuple(range(image.shape[-1]))
+            for bandname, bandnum in zip(cls.__get_bandnames(len(bandsindex)), bandsindex):
                 setattr(cls, bandname, image[:, :, bandnum])
 
             affine = None
@@ -187,37 +192,24 @@ class Image:
     def minmax_norm(self):
         """Normalize the image bands using min-max normalization."""
         bands = list()
-        for bandname in list(Band.__members__.keys()):
-            bands.append(_normalize_band(self[bandname], mask=self.mask))
+        for band in self:
+            bands.append(_normalize_band(band, mask=self.mask))
 
         return Image(cv2.merge(bands), self.affine, self.crs)
 
     def zscore_norm(self, n: int | float = 1., dtype=cv2.CV_8U):
         """Normalize the image bands using z-score normalization."""
         bands = list()
-        for bandname, _ in zip(iter(self), range(self.count)):
-            bands.append(_zscore_band(self[bandname], mask=self.mask))
+        for band in self:
+            bands.append(_zscore_band(band, mask=self.mask))
 
         return Image(cv2.merge(bands), self.affine, self.crs)
 
     def log_norm(self, n: int | float = 1., dtype=cv2.CV_8U):
         """Normalize the image bands using logarithmic transformation."""
         bands = list()
-        for bandname in list(Band.__members__.keys()):
-            bands.append(_log_band(self[bandname], mask=self.mask))
-
-        return Image(cv2.merge(bands), self.affine, self.crs)
-    
-    def clahe(self, **kwargs):
-        """
-        Apply a CLAHE algorithm (Contrast Limited Adaptive Histogram Equalization)
-        to each band of the image.
-
-        kwargs (default) = {clip_limit = 2.0, kernel_size = (3, 3)}
-        """
-        bands = list()
-        for bandname in list(Band.__members__.keys()):
-            bands.append(_clahe(self[bandname], mask=self.mask, **kwargs))
+        for band in self:
+            bands.append(_log_band(band, mask=self.mask))
 
         return Image(cv2.merge(bands), self.affine, self.crs)
 
@@ -240,12 +232,16 @@ class Image:
 
         return Image(self.image[:, :, :3].dot(coeff), self.affine, self.crs, self.nodata)
 
-    def get_band(self, bandname: str | None = None):
+    def get_band(self, n: str | int | None = None):
         """Get a specific band from the image."""
-        if bandname is None:
+        if n in self.bandnames:
+            return self.__getattribute__(n)
+        
+        elif isinstance(n, int):
+            return self[n]
+        
+        elif n is None:
             return self
-        else:
-            return Image(self[bandname], self.affine, self.crs, self.nodata)
 
     def _to_gdal(self, filename, driver: str = 'GTiff') -> None:
         """Save the image as a GDAL file."""
@@ -256,8 +252,8 @@ class Image:
                            crs=self.crs, count=self.count, driver=driver,
                            dtype=self.image.dtype.__str__()) as ds:
 
-            for n, bandname in zip(range(self.count), list(Band._member_map_.keys())):
-                ds.write(self[bandname], n+1)
+            for n, band in enumerate(self):
+                ds.write(self[band], n+1)
 
         print(filename, " saved.")
 
