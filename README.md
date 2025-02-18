@@ -11,7 +11,7 @@ This manual provides instructions on how to use the various modules and function
   - [Table of Contents](#table-of-contents)
   - [Installation](#installation)
   - [Modules Overview](#modules-overview)
-    - [normalize.py](#normalizepy)
+    - [image\_processing.py](#image_processingpy)
     - [metodi.py](#metodipy)
     - [main.py](#mainpy)
     - [interfaces.py](#interfacespy)
@@ -45,7 +45,7 @@ pip install -r requirements.txt
 
 ## Modules Overview
 
-### normalize.py
+### image_processing.py
 
 This module provides various functions for normalizing and transforming 2D arrays and image data. It includes utilities for applying rolling windows, converting arrays to 8-bit unsigned integers, equalizing histograms of image channels, and performing different types of normalization such as standard normalization, power transformation, and z-score normalization.
 
