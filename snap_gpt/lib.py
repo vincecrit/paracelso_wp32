@@ -5,11 +5,12 @@ from pathlib import Path
 import geopandas as gpd
 import shapely
 
-from s1.config import GRAPHS_WD, AOI_GPKG
+from snap_gpt.config import GRAPHS_WD, AOI_GPKG
 
 
 @unique
 class SARPreprocessing(Enum):
+    CSG_SLC_B_DEFAULT = "GSG_SLCB_DFLT"
     S1_SLC_DEFAULT = "S1SLC_DFLT"
     S1_SLC_DEFAULT_BAND3 = "S1SLC_DFLTB3"
     S1_SLC_NO_SPECKLE_FILTER = "S1SLC_NOSF"
@@ -18,10 +19,11 @@ class SARPreprocessing(Enum):
 
 @unique
 class Graphs(Enum):
-    S1SLC_DFLT = GRAPHS_WD / "prep_s1_slc_default.xml"
-    S1SLC_DFLTB3 = GRAPHS_WD / "prep_s1_slc_default+band3.xml"
-    S1SLC_NOSF = GRAPHS_WD / "prep_s1_slc_noSpeckleFilter.xml"
-    S1SLC_NOSFB3 = GRAPHS_WD / "prep_s1_slc_noSpeckleFilter+band3.xml"
+    GSG_SLCB_DFLT = GRAPHS_WD / "csg_scs-b_default.xml"
+    S1SLC_DFLT = GRAPHS_WD / "s1_slc_default.xml"
+    S1SLC_DFLTB3 = GRAPHS_WD / "s1_slc_default+band3.xml"
+    S1SLC_NOSF = GRAPHS_WD / "s1_slc_noSpeckleFilter.xml"
+    S1SLC_NOSFB3 = GRAPHS_WD / "s1_slc_noSpeckleFilter+band3.xml"
 
 
 @unique

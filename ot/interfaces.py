@@ -95,7 +95,7 @@ class Image:
         return self.__getattribute__(name)
     
     @classmethod
-    def __get_bandnames(n): return tuple(f"B{i+1}" for i in range(n))
+    def __get_bandnames(cls, n): return tuple(f"B{i+1}" for i in range(n))
 
     @property
     def nodata(self): return self._nodata

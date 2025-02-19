@@ -2,7 +2,7 @@
 
 ## Introduction
 
-This manual provides instructions on how to use the various modules and functions available in the `paracelso_wp32` package. The package includes utilities for image normalization, optical flow algorithms, and image coregistration.
+This manual provides instructions on how to use the various modules and functions available in the `paracelso_wp32` package. The package includes utilities for image normalization, optical flow algorithms, image coregistration, and SAR preprocessing.
 
 ## Table of Contents
 
@@ -17,10 +17,13 @@ This manual provides instructions on how to use the various modules and function
     - [interfaces.py](#interfacespy)
     - [coreg.py](#coregpy)
     - [algoritmi.py](#algoritmipy)
+    - [snap\_gpt](#snap_gpt)
+    - [s1](#s1)
   - [Usage](#usage)
     - [Image processing](#image-processing)
     - [Optical Flow](#optical-flow)
     - [Coregistration](#coregistration)
+    - [SAR Preprocessing](#sar-preprocessing)
   - [Command Line Interface](#command-line-interface)
     - [Mandatory arguments](#mandatory-arguments)
     - [Common arguments (avaiable to any algorithm)](#common-arguments-avaiable-to-any-algorithm)
@@ -32,6 +35,7 @@ This manual provides instructions on how to use the various modules and function
     - [Example 1: Normalizing an Image](#example-1-normalizing-an-image)
     - [Example 2: Performing Optical Flow](#example-2-performing-optical-flow)
     - [Example 3: Coregistering Images](#example-3-coregistering-images)
+    - [Example 4: Running SAR Preprocessing](#example-4-running-sar-preprocessing)
 
 ## Installation
 
@@ -68,6 +72,14 @@ This module contains a function for basic pixel coregistration between a target 
 ### algoritmi.py
 
 This module contains classes and functions for calculating optical flow between images and performing phase cross-correlation. It provides wrappers for OpenCV and scikit-image optical flow functions and utilities for converting results to GeoDataFrame or DataFrame formats.
+
+### snap_gpt
+
+This module provides utilities for working with SNAP-GPT graphs and subsets. It includes classes for SAR preprocessing, graph management, and area of interest (AOI) handling.
+
+### s1
+
+This module provides preprocessing utilities for Sentinel-1 SAR data. It includes classes and functions for running SAR preprocessing workflows using SNAP-GPT.
 
 ## Usage
 
@@ -107,6 +119,13 @@ algorithm = get_algorithm("OPENCVOF")
 The `coreg.py` module provides a function for basic pixel coregistration:
 
 - `basic_pixel_coregistration(infile: str, match: str, outfile: str)`
+
+### SAR Preprocessing
+
+The `snap_gpt` module provides utilities for SAR preprocessing using SNAP-GPT:
+
+- `GPTSubsetter`: Utility for extracting AOI subsets for SNAP-GPT graphs.
+- `S1Preprocessor`: Class for running Sentinel-1 SAR preprocessing workflows.
 
 ## Command Line Interface
 
@@ -191,7 +210,6 @@ The `main.py` script provides a command-line interface for executing optical flo
 - `--phase_norm`: Type of normalization in cross-correlation.
 - `--upsmp_fac`: Upsample factor for sub-pixel scale shifts.
 
-
 ## Examples
 
 ### Example 1: Normalizing an Image
@@ -235,4 +253,18 @@ result.to_file("output.tif")
 from ot.coreg import basic_pixel_coregistration
 
 basic_pixel_coregistration("target.tif", "reference.tif", "coregistered_output.tif")
+```
+
+### Example 4: Running SAR Preprocessing
+
+```python
+from snap_gpt.lib import AOI, SARPreprocessing
+from s1.preprocessing import S1Preprocessor
+
+subset = AOI.CALITA
+process = SARPreprocessing.S1_SLC_DEFAULT
+sarfile = "path/to/sarfile.zip"
+
+preprocessor = S1Preprocessor(subset, process)
+preprocessor.run(sarfile)
 ```

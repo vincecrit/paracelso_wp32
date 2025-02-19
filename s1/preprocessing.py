@@ -2,9 +2,9 @@ import subprocess as sp
 import sys
 from pathlib import Path
 
-from s1.lib import AOI, GPTSubsetter, Graphs, SARPreprocessing
+from snap_gpt.lib import AOI, GPTSubsetter, Graphs, SARPreprocessing
 from s1.manifest_file import read_orbit_properties
-from s1.config import OUTFOLDER
+from snap_gpt.config import OUTFOLDER
 
 
 class S1Preprocessor:

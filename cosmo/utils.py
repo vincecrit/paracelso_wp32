@@ -4,7 +4,7 @@ from pathlib import Path
 import geopandas as gpd
 import h5py
 
-import csk
+import cosmo
 
 
 class StrChopper:
@@ -75,11 +75,11 @@ def batch_to_image(h5_files: list, wd: str | Path = Path.cwd(),
     for csk_file in h5_files:
         jpeg = wd/f"{csk_file.stem}.{format}"
         print(f"Esporto: {jpeg}")
-        csk.CSKFile(csk_file).qlk_to_image.save(jpeg)
+        cosmo.CSKFile(csk_file).qlk_to_image.save(jpeg)
 
 
 def footprints_to_geopandas(csk_files: list[str]) -> gpd.GeoDataFrame:
 
-    geoms = [csk.CSKFile(file).footprint_polygon for file in csk_files]
+    geoms = [cosmo.CSKFile(file).footprint_polygon for file in csk_files]
 
     return gpd.GeoDataFrame(dict(), crs='EPSG:4326', geometry=geoms)

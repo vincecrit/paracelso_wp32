@@ -54,8 +54,10 @@ def get_parser() -> argparse.ArgumentParser:
     parser.add_argument("--tightness", help=TIGHTNESS, type=float, default=0.3)
     parser.add_argument("--num_iter", help=NUMITER, type=int, default=10)
     parser.add_argument("--tol", help=TOL, type=float, default=1e-4)
-    parser.add_argument("--phase_norm", help=PHASENORM, action="store_true", default=True)
-    parser.add_argument("--upsmp_fac", help=UPSAMPLE_FACTOR, type=float, default=1.0)
+    parser.add_argument("--phase_norm", help=PHASENORM,
+                        action="store_true", default=True)
+    parser.add_argument("--upsmp_fac", help=UPSAMPLE_FACTOR,
+                        type=float, default=1.0)
 
     return parser
 
@@ -72,7 +74,7 @@ def main() -> None:
     if not reference.is_coregistered(target):
         target_coreg = Path(args.target).parent / \
             (Path(args.target).stem+"_coreg.tif")
-        
+
         basic_pixel_coregistration(args.target, args.reference, target_coreg)
         target = Image.from_file(target_coreg, nodata=args.nodata)
 
@@ -80,25 +82,34 @@ def main() -> None:
         reference = reference.log_norm()
         target = target.log_norm()
 
-    elif args.zscore: # se lognorm e zscore sono entrambi True, prevale lognorm
+    elif args.zscore:  # se lognorm e zscore sono entrambi True, prevale lognorm
         reference = reference.zscore_norm()
         target = target.zscore_norm()
 
-    elif args.minmax: # se zscore è True, prevale zscore
+    elif args.minmax:  # se zscore è True, prevale zscore
         reference = reference.minmax_norm()
         target = target.minmax_norm()
 
-    elif args.clahe: # se zscore è True, prevale zscore
+    elif args.clahe:  # se zscore è True, prevale zscore
         reference = reference.cla()
         target = target.minmax_norm()
 
+    if args.band is not None:
+        _reference = reference.get_band(args.band)
+        _target = target.get_band(args.band)
+    
+    else:
+        _reference = reference.to_single_band()
+        _target = target.to_single_band()
+
     # OFFSET TRACKING
-    result = OTMethod(reference=reference.get_band(args.band),
-                        target=target.get_band(args.band))
+    print(_reference.image.shape)
+    print(_target.image.shape)
+    result = OTMethod(_reference, _target)
 
     if isinstance(result, (Image, gpd.GeoDataFrame)):
         result.to_file(args.output)
-    
+
 
 if __name__ == "__main__":
     main()
