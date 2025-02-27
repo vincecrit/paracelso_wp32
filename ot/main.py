@@ -16,6 +16,7 @@ from ot.metodi import get_algorithm
 def get_parser() -> argparse.ArgumentParser:
     """Get the argument parser for the script."""
     parser = argparse.ArgumentParser(description="Optical flow")
+    
     # parametri comuni
     parser.add_argument("-ot", "--algname", help=ALGNAME, type=str)
     parser.add_argument("-r", "--reference", help=REFERENCE, type=str)
@@ -34,6 +35,7 @@ def get_parser() -> argparse.ArgumentParser:
                         default=None, action="store_true")
     parser.add_argument("--clahe", help=CLAHE,
                         default=None, action="store_true")
+    
     # parametri OpenCV
     parser.add_argument("--flow", help=FLOW, default=False)
     parser.add_argument("--levels", help=LEVELS, default=4, type=int)
@@ -45,6 +47,7 @@ def get_parser() -> argparse.ArgumentParser:
     parser.add_argument("--poly_sigma", help=POLY_SIGMA,
                         default=1.1, type=float)
     parser.add_argument("--flags", help=FLAGS, default=None, type=int)
+
     # parametri scikit-image
     parser.add_argument("--radius", help=RADIUS, type=int, default=4)
     parser.add_argument("--num_warp", help=NUMWARP, type=int, default=3)
@@ -64,6 +67,10 @@ def get_parser() -> argparse.ArgumentParser:
 
 def main() -> None:
     """Main function to execute the optical flow algorithm."""
+    import warnings
+    
+    warnings.filterwarnings("ignore")
+    
     args = get_parser().parse_args()
     algorithm = get_algorithm(args.algname)
     OTMethod: OTAlgorithm = algorithm.from_dict(vars(args))
@@ -91,8 +98,8 @@ def main() -> None:
         target = target.minmax_norm()
 
     elif args.clahe:  # se zscore è True, prevale zscore
-        reference = reference.cla()
-        target = target.minmax_norm()
+        reference = reference.clahe()
+        target = target.clahe()
 
     if args.band is not None:
         _reference = reference.get_band(args.band)
@@ -103,8 +110,6 @@ def main() -> None:
         _target = target.to_single_band()
 
     # OFFSET TRACKING
-    print(_reference.image.shape)
-    print(_target.image.shape)
     result = OTMethod(_reference, _target)
 
     if isinstance(result, (Image, gpd.GeoDataFrame)):

@@ -26,7 +26,7 @@
       <outputImageScaleInDb>false</outputImageScaleInDb>
       <createGammaBand>false</createGammaBand>
       <createBetaBand>false</createBetaBand>
-      <selectedPolarisations/>
+      <!-- <selectedPolarisations/> -->
       <outputSigmaBand>true</outputSigmaBand>
       <outputGammaBand>false</outputGammaBand>
       <outputBetaBand>false</outputBetaBand>

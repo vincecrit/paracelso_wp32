@@ -7,11 +7,9 @@ Classi:
     - SkiOpticalFlowTVL1: Wrapper per la funzione `optical_flow_tvl1` di scikit-image.
     - SkiPCC_Vector: Wrapper per il calcolo del vettore di cross-correlazione di fase.
 Funzioni:
-    - xcorr_to_geopandas: Esegue la cross-correlazione di immagini e restituisce un GeoDataFrame o DataFrame con i risultati.
+    - xcorr_to_frame: Esegue la cross-correlazione di immagini e restituisce un GeoDataFrame o DataFrame con i risultati.
 """
-import json
 from enum import Enum, unique
-from pathlib import Path
 
 import cv2
 import geopandas as gpd
@@ -26,12 +24,12 @@ from tqdm import tqdm
 from ot.interfaces import Image, OTAlgorithm
 from ot.image_processing import stepped_rolling_window
 
-
-def xcorr_to_geopandas(ref: Image, tar: Image,
-                       win_size: tuple[int] | int,
-                       step_size: tuple[int] | int,
-                       normalization: str | None = 'phase',
-                       upsample_factor: int | float = 1.0) -> gpd.GeoDataFrame | pd.DataFrame:
+# non so dove metterla
+def xcorr_to_frame(ref: Image, tar: Image,
+                   win_size: tuple[int] | int,
+                   step_size: int,
+                   normalization: str | None = 'phase',
+                   upsample_factor: int | float = 1.0) -> gpd.GeoDataFrame | pd.DataFrame:
     """
     Cross-correlazione di immagini. Di default, normalizza le immagini
     attraverso FFT, eseguendo quindi una cross-correlazione di fase (PCC);
@@ -66,12 +64,9 @@ def xcorr_to_geopandas(ref: Image, tar: Image,
     if isinstance(win_size, int):
         win_size = win_size, win_size
 
-    if isinstance(step_size, int):
-        step_size = step_size, step_size
-
-    index, _ref = stepped_rolling_window(ref.image, win_size, step_size)
+    _ref, index = stepped_rolling_window(ref.image, win_size, step_size)
     assert index.shape[0] == _ref.shape[0], f"{index.shape[0] =} {_ref.shape[0] =}"
-    _, _tar = stepped_rolling_window(tar.image, win_size, step_size)
+    _tar, _ = stepped_rolling_window(tar.image, win_size, step_size)
 
     offset_record = list()
     for (r, t) in tqdm(iterable=zip(_ref, _tar), desc=f"IMGCORR", total=index.shape[0], ncols=150):
@@ -145,55 +140,6 @@ class OpenCVOpticalFlow(OTAlgorithm):
         self.poly_sigma = poly_sigma
         self.flags = flags
 
-    @staticmethod
-    def from_dict(__d: dict):
-        """
-        restituisce un'istanza della classe estraendo da `__d` solo gli
-        argomenti necessari.
-        """
-        keys = [
-            "flow",
-            "pyr_scale",
-            "levels",
-            "winsize",
-            "iterations",
-            "poly_n",
-            "poly_sigma",
-            "flags",
-        ]
-
-        kw = dict()
-        for key in keys:
-            kw[key] = __d.get(key, None)
-
-        return OpenCVOpticalFlow(**kw)
-
-    @staticmethod
-    def from_JSON(__json: Path | str):
-        """Create an instance from a JSON file."""
-        __d = json.loads(Path(__json).read_text())
-
-        return OpenCVOpticalFlow.from_dict(__d)
-
-    @staticmethod
-    def from_YAML(__yaml: Path | str):
-        """Create an instance from a YAML file."""
-        import yaml
-
-        __d = yaml.safe_load(Path(__yaml).read_text())
-
-        return OpenCVOpticalFlow.from_dict(__d)
-
-    def toJSON(self):
-        """Convert the instance to a JSON string."""
-        try:
-            parms = self.__dict__
-            parms['flags'] = self.flags.value
-        except AttributeError:
-            parms = self.__dict__
-
-        return json.dumps(parms, indent=4)
-
     def __call__(self, reference: Image, target: Image) -> Image:
         """Calculate optical flow between reference and target images."""
         pixel_offsets = cv2.calcOpticalFlowFarneback(prev=reference.image, next=target.image,
@@ -224,39 +170,6 @@ class SkiOpticalFlowILK(OTAlgorithm):
         self.prefilter = prefilter
         self.dtype = dtype
 
-    @staticmethod
-    def from_dict(__d: dict):
-        """Create an instance from a dictionary."""
-        keys = [
-            "radius",
-            "num_warp",
-            "gaussian",
-            "prefilter",
-            "dtype"
-        ]
-
-        kw = dict()
-        for key in keys:
-            kw[key] = __d.get(key, None)
-
-        return SkiOpticalFlowILK(**kw)
-
-    @staticmethod
-    def from_JSON(__json: Path | str):
-        """Create an instance from a JSON file."""
-        __d = json.loads(Path(__json).read_text())
-
-        return SkiOpticalFlowILK.from_dict(__d)
-
-    @staticmethod
-    def from_YAML(__yaml: Path | str):
-        """Create an instance from a YAML file."""
-        import yaml
-
-        __d = yaml.safe_load(Path(__yaml).read_text())
-
-        return SkiOpticalFlowILK.from_dict(__d)
-
     def __call__(self, reference: Image, target: Image) -> Image:
         """Calculate optical flow between reference and target images using ILK method."""
         pixel_offsets = optical_flow_ilk(reference.image, target.image, radius=self.radius,
@@ -283,41 +196,6 @@ class SkiOpticalFlowTVL1(OTAlgorithm):
         self.tol = tol
         self.prefilter = prefilter
         self.dtype = dtype
-
-    @staticmethod
-    def from_dict(__d: dict):
-        """Create an instance from a dictionary."""
-        keys = [  # perchè non ho messo 'band' ???
-            "attachment",
-            "tightness",
-            "num_warp",
-            "num_iter",
-            "tol",
-            "prefilter",
-            "dtype"
-        ]
-
-        kw = dict()
-        for key in keys:
-            kw[key] = __d.get(key, None)
-
-        return SkiOpticalFlowTVL1(**kw)
-
-    @staticmethod
-    def from_JSON(__json: Path | str):
-        """Create an instance from a JSON file."""
-        __d = json.loads(Path(__json).read_text())
-
-        return SkiOpticalFlowTVL1.from_dict(__d)
-
-    @staticmethod
-    def from_YAML(__yaml: Path | str):
-        """Create an instance from a YAML file."""
-        import yaml
-
-        __d = yaml.safe_load(Path(__yaml).read_text())
-
-        return SkiOpticalFlowTVL1.from_dict(__d)
 
     def __call__(self, reference: Image, target: Image) -> Image:
         """Calculate optical flow between reference and target images using TVL1 method."""
@@ -354,44 +232,12 @@ class SkiPCC_Vector(OTAlgorithm):
         self.step_size = step_size
         self.upsmp_fac = upsmp_fac
 
-    @staticmethod
-    def from_dict(__d: dict):
-        """Create an instance from a dictionary."""
-        keys = [
-            "winsize",
-            "step_size",
-            "phase_norm",
-            "upsmp_fac",
-        ]
-
-        kw = dict()
-        for key in keys:
-            kw[key] = __d.get(key, None)
-
-        return SkiPCC_Vector(**kw)
-
-    @staticmethod
-    def from_JSON(__json: Path | str):
-        """Create an instance from a JSON file."""
-        __d = json.loads(Path(__json).read_text())
-
-        return SkiPCC_Vector.from_dict(__d)
-
-    @staticmethod
-    def from_YAML(__yaml: Path | str):
-        """Create an instance from a YAML file."""
-        import yaml
-
-        __d = yaml.safe_load(Path(__yaml).read_text())
-
-        return SkiPCC_Vector.from_dict(__d)
-
     def __call__(self, reference: Image, target: Image) -> gpd.GeoDataFrame | pd.DataFrame:
         """Calculate phase cross-correlation between reference and target images."""
         self.toJSON(self.__dict__)
 
-        return xcorr_to_geopandas(ref=reference, tar=target,
-                                  win_size=self.winsize,
-                                  step_size=self.step_size,
-                                  normalization=self.normalization,
-                                  upsample_factor=self.upsmp_fac)
+        return xcorr_to_frame(ref=reference, tar=target,
+                              win_size=self.winsize,
+                              step_size=self.step_size,
+                              normalization=self.normalization,
+                              upsample_factor=self.upsmp_fac)
