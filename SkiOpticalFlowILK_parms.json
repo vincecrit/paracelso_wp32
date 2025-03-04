@@ -1,0 +1,6 @@
+{
+    "radius": 4,
+    "num_warp": 3,
+    "gaussian": false,
+    "prefilter": false
+}

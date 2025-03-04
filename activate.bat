@@ -1,3 +1,3 @@
 @ECHO OFF
 ECHO ATTIVO AMBIENTE
-CALL .\wp32\Scripts\activate.bat
+cmd /b .\wp32\Scripts\activate

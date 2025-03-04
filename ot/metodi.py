@@ -21,6 +21,6 @@ class AlgFactory(Enum):
     SKIPCCV = algoritmi.SkiPCC_Vector
 
 
-def get_algorithm(algname: str) -> interfaces.OTAlgorithm:
+def get_method(algname: str) -> interfaces.OTAlgorithm:
     """Get an algorithm instance by name."""
     return eval(f"AlgFactory.{algname}.value")

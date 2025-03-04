@@ -1,22 +1,26 @@
 import argparse
 from pathlib import Path
 
-import geopandas as gpd
+import cv2
+import numpy as np
 
-from ot.coreg import basic_pixel_coregistration
-from ot.helpmsg import (ALGNAME, ATTACHMENT, BAND, FLAGS, FLOW, GAUSSIAN,
-                        ITERATIONS, LEVELS, LOGNORM, MINMAX, NODATA, NORMALIZE,
-                        NUMITER, NUMWARP, OUTPUT, POLY_N, POLY_SIGMA, CLAHE,
-                        PREFILTER, PYR_SCALE, RADIUS, REFERENCE, TARGET, UPSAMPLE_FACTOR,
-                        TIGHTNESS, TOL, WINSIZE, ZSCORENORM, STEPSIZE, PHASENORM)
-from ot.interfaces import Image, OTAlgorithm
-from ot.metodi import get_algorithm
+from ot import logger
+from ot.helpmsg import (ALGNAME, ATTACHMENT, BAND, CLAHE, FLAGS, FLOW,
+                        GAUSSIAN, ITERATIONS, LEVELS, LOGNORM, MINMAX, NODATA,
+                        NORMALIZE, NUMITER, NUMWARP, OUTPUT, PHASENORM, POLY_N,
+                        POLY_SIGMA, PREFILTER, PYR_SCALE, RADIUS, REFERENCE,
+                        STEPSIZE, TARGET, TIGHTNESS, TOL, UPSAMPLE_FACTOR,
+                        WINSIZE, ZSCORENORM)
+from ot.interfaces import Image
+from ot.metodi import get_method
+from ot.utils import (basic_pixel_coregistration, cv2imread, load_raster,
+                      registration)
 
 
 def get_parser() -> argparse.ArgumentParser:
     """Get the argument parser for the script."""
     parser = argparse.ArgumentParser(description="Optical flow")
-    
+
     # parametri comuni
     parser.add_argument("-ot", "--algname", help=ALGNAME, type=str)
     parser.add_argument("-r", "--reference", help=REFERENCE, type=str)
@@ -25,19 +29,10 @@ def get_parser() -> argparse.ArgumentParser:
                         default="output.tif", type=str)
     parser.add_argument("-b", "--band", help=BAND, default=None, type=str)
     parser.add_argument("--nodata", help=NODATA, default=None, type=float)
-    parser.add_argument("--lognorm", help=LOGNORM,
-                        default=False, action="store_true")
-    parser.add_argument("--normalize", help=NORMALIZE,
-                        default=False, action="store_true")
-    parser.add_argument("--zscore", help=ZSCORENORM,
-                        default=None, action="store_true")
-    parser.add_argument("--minmax", help=MINMAX,
-                        default=None, action="store_true")
-    parser.add_argument("--clahe", help=CLAHE,
-                        default=None, action="store_true")
-    
+    parser.add_argument("--preprocessing", default=None, type=str)
+
     # parametri OpenCV
-    parser.add_argument("--flow", help=FLOW, default=False)
+    parser.add_argument("--flow", help=FLOW, default=None)
     parser.add_argument("--levels", help=LEVELS, default=4, type=int)
     parser.add_argument("--pyr_scale", help=PYR_SCALE, default=0.5, type=float)
     parser.add_argument("--winsize", help=WINSIZE, type=int, default=4)
@@ -65,55 +60,147 @@ def get_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main() -> None:
-    """Main function to execute the optical flow algorithm."""
-    import warnings
-    
-    warnings.filterwarnings("ignore")
-    
-    args = get_parser().parse_args()
-    algorithm = get_algorithm(args.algname)
-    OTMethod: OTAlgorithm = algorithm.from_dict(vars(args))
+def load_file(source, **kwargs):
+    source = Path(source)
 
-    reference = Image.from_file(args.reference, nodata=args.nodata)
-    target = Image.from_file(args.target, nodata=args.nodata)
+    if not source.is_file():
+        logger.critical(f"Il file {source} non esiste")
+        exit(0)
 
-    if not reference.is_coregistered(target):
-        target_coreg = Path(args.target).parent / \
-            (Path(args.target).stem+"_coreg.tif")
+    match source.suffix:
+        case ".tif":
+            dataset, affine, crs = load_raster(source, **kwargs)
+            img_format = "raster"
+        case ".tiff":
+            dataset, affine, crs = load_raster(source, **kwargs)
+            img_format = "raster"
+        case ".jpg":
+            dataset = cv2imread(source, cv2.COLOR_BGR2RGB)
+            affine = None
+            crs = None
+            img_format = "generic"
+        case ".jpeg":
+            dataset = cv2imread(source, cv2.COLOR_BGR2RGB)
+            affine = None
+            crs = None
+            img_format = "generic"
+        case ".png":
+            dataset = cv2imread(source, cv2.COLOR_BGR2RGB)
+            affine = None
+            crs = None
+            img_format = "generic"
 
-        basic_pixel_coregistration(args.target, args.reference, target_coreg)
-        target = Image.from_file(target_coreg, nodata=args.nodata)
+    return img_format, Image(dataset, affine, crs)
 
-    if args.lognorm:
-        reference = reference.log_norm()
-        target = target.log_norm()
 
-    elif args.zscore:  # se lognorm e zscore sono entrambi True, prevale lognorm
-        reference = reference.zscore_norm()
-        target = target.zscore_norm()
+def load_images(*args):
+    try:
+        reference_file, target_file = [Path(src) for src in args]
 
-    elif args.minmax:  # se zscore è True, prevale zscore
-        reference = reference.minmax_norm()
-        target = target.minmax_norm()
+    except ValueError as err:
+        logger.critical(f"Troppi argomenti di input (attesi 2)")
+        logger.debug(f"{err}")
+        exit(0)
 
-    elif args.clahe:  # se zscore è True, prevale zscore
-        reference = reference.clahe()
-        target = target.clahe()
+    logger.info(f"REFERENCE: {reference_file.name}")
+    logger.info(f"TARGET: {target_file.name}")
 
-    if args.band is not None:
-        _reference = reference.get_band(args.band)
-        _target = target.get_band(args.band)
-    
+    if not reference_file.suffix == target_file.suffix:
+        logger.critical("Le due immagini hanno formati diversi")
+        logger.debug(f"{reference_file.suffix=}, {target_file.suffix=}")
+        exit(0)
+
     else:
-        _reference = reference.to_single_band()
-        _target = target.to_single_band()
+        ref_format, reference = load_file(reference_file)
+        tar_format, target = load_file(target_file)
 
-    # OFFSET TRACKING
-    result = OTMethod(_reference, _target)
+        if ref_format == tar_format == "raster":
 
-    if isinstance(result, (Image, gpd.GeoDataFrame)):
-        result.to_file(args.output)
+            if not reference.is_coregistered(target):
+                logger.info("Eseguo coregistrazione tra immagini raster")
+
+                target_coreg = target_file.parent/(
+                    target_file.stem + "_coreg" + target_file.suffix)
+
+                basic_pixel_coregistration(str(target_file), str(
+                    reference_file), str(target_coreg))
+
+                logger.info(
+                    f"Coregistrazione eseguita correttamente. File coregistrato: {target_coreg}")
+                _, target = load_file(target_coreg)
+
+            else:
+                logger.info("Immagini raster già coregistrate.")
+
+        else:
+            logger.info("Immagini di input non raster")
+
+            if not reference.is_coregistered(target):
+                raise ValueError(
+                    "Le immagini di input hanno dimensioni diverse")
+
+            else:
+                logger.info(
+                    "Le immagini di input presentano le medesime dimensioni")
+
+        return reference, target
+
+
+def print_summary_statistics(array):
+    print(f"\n{'<'*15}| STATS |{'>'*15}")
+    print(f"              Mean: {np.mean(array): .3g}")
+    print(f"            Median: {np.median(array): .3g}")
+    print(f"Standard Deviation: {np.std(array): .3g}")
+    print(f"           Minimum: {np.min(array): .3g}")
+    print(f"           Maximum: {np.max(array): .3g}")
+    print(f"   25th Percentile: {np.percentile(array, 25): .3g}")
+    print(f"   75th Percentile: {np.percentile(array, 75): .3g}")
+
+
+def main() -> None:
+    import warnings
+
+    warnings.filterwarnings("ignore")
+
+    args = get_parser().parse_args()
+
+    method = get_method(args.algname)
+    algorithm = method.from_dict(vars(args))
+    logger.info(f"Algoritmo {algorithm.__class__.__name__}")
+    algorithm.toJSON()
+
+    dispatcher = registration()
+    reference, target = load_images(args.reference, args.target)
+
+    prep_imgs = list()
+    for img in (reference, target):
+        match algorithm.library:
+            case "OpenCV":
+                info_ = f"Esecuzione {args.preprocessing.upper()} mediante libreria OpenCV"
+                logger.info(info_)
+
+                output = dispatcher.dispatch_process(
+                    "cv2_"+args.preprocessing, array=img)
+                prep_imgs.append(output)
+
+            case "scikit-image":
+                info_ = f"Esecuzione {args.preprocessing.upper()} mediante libreria scikit-image"
+                logger.info(info_)
+
+                output = dispatcher.dispatch_process(
+                    "ski_"+args.preprocessing, array=img)
+                prep_imgs.append(output)
+
+    logger.info(f"{args.preprocessing.upper()} eseguito correttamente.")
+
+    logger.debug(
+        f"Output {args.preprocessing.upper()}: {[type(e) for e in prep_imgs]}")
+    displacements = algorithm(*prep_imgs)
+    logger.info(
+        f"Algoritmo {algorithm.__class__.__name__} eseguito correttamente")
+    logger.info(f"Esporto su file: {args.output}")
+    
+    print_summary_statistics(displacements)
 
 
 if __name__ == "__main__":

@@ -14,7 +14,6 @@ Functions:
     - Image.__getitem__: Get a specific band by index.
     - Image.__get_bandnames: Returns a tuple of band names.
     - Image.bandnames: Get a tuple of the band names.
-    - Image.from_file: Create an Image instance from a file.
     - Image.split_channels: Split the image into its individual channels.
     - Image.is_coregistered: Check if the image is coregistered with another image.
     - Image.minmax_norm: Normalize the image bands using min-max normalization.
@@ -23,9 +22,7 @@ Functions:
     - Image._normalize: Normalize the image using OpenCV normalization.
     - Image.to_single_band: Convert an RGB image to grayscale using specified coefficients.
     - Image.get_band: Get a specific band from the image.
-    - Image._to_gdal: Save the image as a GDAL file.
-    - Image._to_image: Save the image as a standard image file.
-    - Image.to_file: Save the image to a file.
+    - OTAlgorithm.library: libreria di appartenenza.
     - OTAlgorithm.from_dict: Create an instance from a dictionary.
     - OTAlgorithm.from_JSON: Create an instance from a JSON file.
     - OTAlgorithm.from_YAML: Create an instance from a YAML file.
@@ -35,18 +32,16 @@ Functions:
     - OTAlgorithm.__call__: Call the algorithm.
 """
 import json
+import logging
 from abc import ABC
-from enum import Enum, unique
 from inspect import signature
 from pathlib import Path
 
 import cv2
 import numpy as np
-import rasterio
 from rasterio import CRS, Affine
 
-from ot.image_processing import cv2_clahe, norm_log, norm_minmax, norm_zscore
-
+logger = logging.getLogger(__name__)
 
 class Image:
     """Class representing an image with multiple bands."""
@@ -86,15 +81,15 @@ class Image:
 
     def __repr__(self): return f"{self.image}\n{self.affine}\n{self.crs}"
     def __len__(self): return self.count
-
+    
     def __iter__(self):
         for band in self.bandnames:
             yield self.__getattribute__(band)
-
+        
     def __getitem__(self, __index):
         name = list(self.bandnames)[__index]
         return self.__getattribute__(name)
-
+    
     @classmethod
     def __get_bandnames(cls, n): return tuple(f"B{i+1}" for i in range(n))
 
@@ -138,43 +133,6 @@ class Image:
     @property
     def shape(self): return self.get_band(0).image.shape
 
-    @classmethod
-    def from_file(cls, source: str, nodata: int | float | None = None) -> None:
-        """Create an Image instance from a file."""
-        assert Path(source).exists(), f"File {source} does not exist"
-        assert Path(source).is_file(), f"File {source} is not a file"
-
-        source = Path(source)
-        suffix = source.suffix
-
-        if (suffix in ['.tiff', '.tif']):
-            with rasterio.open(str(source)) as src:
-                bands = list()
-
-                bandsindex = tuple(range(1, src.meta["count"] + 1))
-                for bandname, bandnum in zip(cls.__get_bandnames(len(bandsindex)), bandsindex):
-                    band_array = src.read(bandnum)
-                    setattr(cls, bandname, band_array)
-                    bands.append(band_array)
-
-                image = cv2.merge(bands)
-                affine = src.meta['transform']
-                crs = src.meta['crs']
-                nodata = src.meta['nodata'] or nodata
-
-        elif suffix in ['.jpg', '.jpeg', '.png']:
-            image = cv2.imread(str(source), cv2.IMREAD_COLOR)
-
-            bandsindex = tuple(range(image.shape[-1]))
-            for bandname, bandnum in zip(cls.__get_bandnames(len(bandsindex)), bandsindex):
-                setattr(cls, bandname, image[:, :, bandnum])
-
-            affine = None
-            crs = None
-            nodata = None
-
-        return cls(image, affine, crs, nodata)
-
     def split_channels(self):
         """Split the image into its individual channels."""
         imgs = list()
@@ -185,99 +143,32 @@ class Image:
         return imgs
 
     def is_coregistered(self, __other) -> bool:
-        """Check if the image is coregistered with another image."""
-        assert all([self.affine is not None, __other.affine is not None])
-        return self.affine == __other.affine
+        """
+        Check if the image is coregistered with another image.
+        """
+        if all([self.affine is not None, __other.affine is not None]):
+            return self.affine == __other.affine
+        elif any([self.affine is not None, __other.affine is not None]):
+            raise ValueError("Una delle due immagini non possiede georeferenziazione")
+        else:
+            Warning("Il controllo di coregistrazione per immagini non raster è molto approssimativo.")
+            return self.shape == __other.shape
 
-    def minmax_norm(self):
-        """Normalize the image bands using min-max normalization."""
-        bands = list()
-        for band in self:
-            bands.append(norm_minmax(band))
-
-        return Image(cv2.merge(bands), self.affine, self.crs)
-
-    def zscore_norm(self):
-        """Normalize the image bands using z-score normalization."""
-        bands = list()
-        for band in self:
-            bands.append(norm_zscore(band))
-
-        return Image(cv2.merge(bands), self.affine, self.crs)
-
-    def clahe(self):
-        """Normalize the image bands using z-score normalization."""
-        bands = list()
-        for band in self:
-            bands.append(cv2_clahe(band))
-
-        return Image(cv2.merge(bands), self.affine, self.crs)
-
-    def log_norm(self):
-        """Normalize the image bands using logarithmic transformation."""
-        bands = list()
-        for band in self:
-            bands.append(norm_log(band))
-
-        return Image(cv2.merge(bands), self.affine, self.crs)
-    # magari la elimino
-
-    def _normalize(self, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8U):
-        """Normalize the image using OpenCV normalization."""
-        new_image = cv2.normalize(
-            self.image, dst=None, alpha=alpha, beta=beta, norm_type=norm_type, dtype=dtype)
-        return Image(new_image, self.affine, self.crs)
-
-    def to_single_band(self, coeff: list | np.ndarray | None = None, dtype: int | None = None):
-        """Convert an RGB image to grayscale using specified coefficients."""
-        '''
-        Converte un'immagine RGB in scala di grigi utilizzando la formula:
-        Y709 = 0.2125*R + 0.7154*G + 0.0721*B
-        '''
-        if not self.n_channels == 3:
-            raise ValueError("Input image must be a 3D array")
-
-        coeff = np.asarray(coeff) or np.array([0.21250, 0.71540, 0.07210])
-        band = self.image[:, :, :3].dot(coeff)
-        return Image(band, self.affine, self.crs, self.nodata)
 
     def get_band(self, n: str | int | None = None):
-        """Get a specific band from the image."""
+        """
+        Get a specific band from the image.
+        """
         if n in self.bandnames:
             band = self.__getattribute__(n)
             return Image(band, self.affine, self.crs, self.nodata)
-
+        
         elif isinstance(n, int):
             band = self[n]
             return Image(band, self.affine, self.crs, self.nodata)
-
+        
         elif n is None:
             return self
-
-    def _to_gdal(self, filename, driver: str = 'GTiff') -> None:
-        """Save the image as a GDAL file."""
-        height, width = self.shape
-
-        with rasterio.open(filename, 'w', nodata=self.nodata,
-                           transform=self.affine, width=width, height=height,
-                           crs=self.crs, count=self.count, driver=driver,
-                           dtype=self.image.dtype.__str__()) as ds:
-
-            for n, band in enumerate(self):
-                ds.write(band, n+1)
-
-        print(filename, " saved.")
-
-    def _to_image(self, filename) -> None:
-        """Save the image as a standard image file."""
-        raise NotImplementedError
-
-    def to_file(self, filename) -> None:
-        """Save the image to a file."""
-        if all([self.affine, self.crs]):
-            self._to_gdal(filename)
-        else:
-            self._to_image(filename)
 
 
 class OTAlgorithm(ABC):
@@ -323,9 +214,12 @@ class OTAlgorithm(ABC):
     def toJSON(self, file: str | Path = None) -> None:
         """Convert the instance to a JSON string and save to a file."""
         parms = self.__dict__
+        print(self.__dict__)
 
         if file is None:
             file = f"{self.__class__.__name__}_parms.json"
+
+        logger.info(f"Esporto parametri su file: {file}")
 
         Path(file).write_text(json.dumps(parms, indent=4))
 

@@ -7,8 +7,10 @@ Classi:
     - SkiOpticalFlowTVL1: Wrapper per la funzione `optical_flow_tvl1` di scikit-image.
     - SkiPCC_Vector: Wrapper per il calcolo del vettore di cross-correlazione di fase.
 Funzioni:
+    - stepped_rolling_window: funzione per generazione di finestre mobili.
     - xcorr_to_frame: Esegue la cross-correlazione di immagini e restituisce un GeoDataFrame o DataFrame con i risultati.
 """
+import logging
 from enum import Enum, unique
 
 import cv2
@@ -19,10 +21,44 @@ from geopandas import points_from_xy
 from rasterio.transform import AffineTransformer
 from skimage.registration import (optical_flow_ilk, optical_flow_tvl1,
                                   phase_cross_correlation)
+from skimage.util import view_as_windows
 from tqdm import tqdm
 
 from ot.interfaces import Image, OTAlgorithm
-from ot.image_processing import stepped_rolling_window
+
+logger = logging.getLogger(__name__)
+
+def stepped_rolling_window(array_2d: np.ndarray, window_shape: tuple[int], step: int):
+    """
+    Restituisce le finestre mobili dell'array di input utilizzando la funzione
+    `skimage.utils.view_as_windows` e gli indici corrispondenti al centro di ogni
+    finestra.
+
+    Args:
+        array_2d (np.ndarray): Array 2D di input.
+        window_shape (tuple): Dimensione della finestra (altezza, larghezza).
+        step (int): Passo di campionamento, considerato omogeneo nelle 2 direzioni.
+
+    Returns:
+        windows (np.ndarray): finestre mobili (NxM, *window_shape)
+        centers (np.ndarray): indici corrispondenti ai centri delle finestre (NxM, 2).
+    """
+    windows = view_as_windows(
+        arr_in=array_2d, window_shape=window_shape, step=step)
+
+    # Calcolo dell'offset per il centro della finestra
+    center_offset_row = window_shape[0] // 2
+    center_offset_col = window_shape[1] // 2
+
+    centers = []
+    for i in range(windows.shape[0]):
+        for j in range(windows.shape[1]):
+            center_row = i * step + center_offset_row
+            center_col = j * step + center_offset_col
+            centers.append((center_row, center_col))
+
+    return windows.reshape(-1, *window_shape), np.array(centers)
+
 
 # non so dove metterla
 def xcorr_to_frame(ref: Image, tar: Image,
@@ -60,6 +96,10 @@ def xcorr_to_frame(ref: Image, tar: Image,
         spostamenti sono espressi nell'unità di misura propria delle immagini
         di partenza.
     """
+        
+    logger.info("Eseguo algoritmo skimage.registration.phase_cross_correlation")
+    logger.debug(f"{ref.shape = }, {ref.image.dtype = }")
+    logger.debug(f"{tar.shape = }, {tar.image.dtype = }")
 
     if isinstance(win_size, int):
         win_size = win_size, win_size
@@ -126,7 +166,9 @@ class OpenCVOpticalFlow(OTAlgorithm):
             - `OPTFLOW_Flags.OPTFLOW_FARNEBACK_GAUSSIAN` (256) uses the Gaussian filter instead of a box filter of the same size for optical flow estimation. Usually, this option gives more accurate flow than with a box filter, at the cost of lower speed. Defaults to OPTFLOW_Flags.OPTFLOW_FARNEBACK_GAUSSIAN.
     """
 
-    def __init__(self, flow: np.ndarray = False,
+    library = 'OpenCV'
+
+    def __init__(self, flow: np.ndarray = None,
                  pyr_scale: float = 0.5, levels: int = 4, winsize: int = 16,
                  iterations: int = 5, poly_n: int = 5, poly_sigma: float = 1.1,
                  flags: int = OPTFLOW_Flags.OPTFLOW_DEFAULT) -> None:
@@ -138,10 +180,19 @@ class OpenCVOpticalFlow(OTAlgorithm):
         self.iterations = iterations
         self.poly_n = poly_n
         self.poly_sigma = poly_sigma
-        self.flags = flags
+        try:
+            self.flags = flags.value
+        except AttributeError:
+            self.flags = flags\
 
     def __call__(self, reference: Image, target: Image) -> Image:
-        """Calculate optical flow between reference and target images."""
+        """
+        Calculate optical flow between reference and target images.
+        """
+        logger.info("Eseguo algoritmo cv2.calcOpticalFlowFarneback")
+        logger.debug(f"{reference.shape = }, {reference.image.dtype = }")
+        logger.debug(f"{target.shape = }, {target.image.dtype = }")
+
         pixel_offsets = cv2.calcOpticalFlowFarneback(prev=reference.image, next=target.image,
                                                      flow=self.flow,
                                                      pyr_scale=self.pyr_scale,
@@ -152,29 +203,44 @@ class OpenCVOpticalFlow(OTAlgorithm):
                                                      poly_sigma=self.poly_sigma,
                                                      flags=self.flags)
 
+        logger.debug(f"Tipo output: {pixel_offsets.dtype}")
+        logger.debug(f"Shape output: {pixel_offsets.shape}")
+
         displ = self._to_displacements(target.affine, pixel_offsets)
 
         return Image(displ, target.affine, target.crs, target.nodata)
 
 
 class SkiOpticalFlowILK(OTAlgorithm):
-    """Wrapper for scikit-image's optical_flow_ilk function."""
+    """
+    Wrapper for scikit-image's optical_flow_ilk function.
+    """
+
+    library = 'scikit-image'
 
     def __init__(self, radius=7,
-                 num_warp=10, gaussian=False, prefilter=False,
-                 dtype=np.float32):
+                 num_warp=10, gaussian=False, prefilter=False):
 
         self.radius = radius
         self.num_warp = num_warp
         self.gaussian = gaussian
         self.prefilter = prefilter
-        self.dtype = dtype
 
     def __call__(self, reference: Image, target: Image) -> Image:
-        """Calculate optical flow between reference and target images using ILK method."""
+        """
+        Calculate optical flow between reference and target images using ILK method.
+        """
+        logger.info("Eseguo algoritmo skimage.registration.optical_flow_ilk")
+        logger.debug(f"{reference.shape = }, {reference.image.dtype = }")
+        logger.debug(f"{target.shape = }, {target.image.dtype = }")
+
         pixel_offsets = optical_flow_ilk(reference.image, target.image, radius=self.radius,
                                          num_warp=self.num_warp, gaussian=self.gaussian,
-                                         prefilter=self.prefilter, dtype=self.dtype)
+                                         prefilter=self.prefilter)
+
+        logger.debug(f"Numero output: {len(pixel_offsets)}")
+        logger.debug(f"Tipo output: {[type(e) for e in pixel_offsets]}")
+        logger.debug(f"Shape output: {[e.shape for e in pixel_offsets]}")
 
         a, b = pixel_offsets
         displ = self._to_displacements(target.affine, cv2.merge([a, b]))
@@ -183,11 +249,14 @@ class SkiOpticalFlowILK(OTAlgorithm):
 
 
 class SkiOpticalFlowTVL1(OTAlgorithm):
-    """Wrapper for scikit-image's optical_flow_tvl1 function."""
+    """
+    Wrapper for scikit-image's optical_flow_tvl1 function
+    """
+
+    library = 'scikit-image'
 
     def __init__(self, attachment=15, tightness=0.3,
-                 num_warp=5, num_iter=10, tol=1e-4, prefilter=False,
-                 dtype=np.float32):
+                 num_warp=5, num_iter=10, tol=1e-4, prefilter=False):
 
         self.attachment = attachment
         self.tightness = tightness
@@ -195,10 +264,15 @@ class SkiOpticalFlowTVL1(OTAlgorithm):
         self.num_iter = num_iter
         self.tol = tol
         self.prefilter = prefilter
-        self.dtype = dtype
 
     def __call__(self, reference: Image, target: Image) -> Image:
-        """Calculate optical flow between reference and target images using TVL1 method."""
+        """
+        Calculate optical flow between reference and target images using TVL1 method.
+        """
+        logger.info("Eseguo algoritmo skimage.registration.optical_flow_tvl1")
+        logger.debug(f"{reference.image.shape = }, {reference.image.dtype = }")
+        logger.debug(f"{target.image.shape = }, {target.image.dtype = }")
+
         pixel_offsets = optical_flow_tvl1(
             reference.image, target.image,
             attachment=self.attachment,
@@ -206,8 +280,11 @@ class SkiOpticalFlowTVL1(OTAlgorithm):
             num_warp=self.num_warp,
             num_iter=self.num_iter,
             tol=self.tol,
-            prefilter=self.prefilter,
-            dtype=self.dtype)
+            prefilter=self.prefilter)
+
+        logger.debug(f"Numero output: {len(pixel_offsets)}")
+        logger.debug(f"Tipo output: {[type(e) for e in pixel_offsets]}")
+        logger.debug(f"Shape output: {[e.shape for e in pixel_offsets]}")
 
         a, b = pixel_offsets
         displ = self._to_displacements(target.affine, cv2.merge([a, b]))
@@ -216,7 +293,11 @@ class SkiOpticalFlowTVL1(OTAlgorithm):
 
 
 class SkiPCC_Vector(OTAlgorithm):
-    """Wrapper for phase cross-correlation vector calculation."""
+    """
+    Wrapper for phase cross-correlation vector calculation.
+    """
+
+    library = 'scikit-image'
 
     def __init__(self, winsize: tuple[int] | int,
                  step_size: tuple[int] | int,
@@ -234,7 +315,7 @@ class SkiPCC_Vector(OTAlgorithm):
 
     def __call__(self, reference: Image, target: Image) -> gpd.GeoDataFrame | pd.DataFrame:
         """Calculate phase cross-correlation between reference and target images."""
-        self.toJSON(self.__dict__)
+        # self.toJSON(self.__dict__)
 
         return xcorr_to_frame(ref=reference, tar=target,
                               win_size=self.winsize,
