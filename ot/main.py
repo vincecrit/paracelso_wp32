@@ -11,10 +11,10 @@ from ot.helpmsg import (ALGNAME, ATTACHMENT, BAND, CLAHE, FLAGS, FLOW,
                         POLY_SIGMA, PREFILTER, PYR_SCALE, RADIUS, REFERENCE,
                         STEPSIZE, TARGET, TIGHTNESS, TOL, UPSAMPLE_FACTOR,
                         WINSIZE, ZSCORENORM)
+from ot.image_processing import dispatcher
 from ot.interfaces import Image
 from ot.metodi import get_method
-from ot.utils import (basic_pixel_coregistration, cv2imread, load_raster,
-                      registration)
+from ot.utils import basic_pixel_coregistration, cv2imread, load_raster
 
 
 def get_parser() -> argparse.ArgumentParser:
@@ -56,6 +56,8 @@ def get_parser() -> argparse.ArgumentParser:
                         action="store_true", default=True)
     parser.add_argument("--upsmp_fac", help=UPSAMPLE_FACTOR,
                         type=float, default=1.0)
+
+    parser
 
     return parser
 
@@ -115,68 +117,56 @@ def load_images(*args):
         tar_format, target = load_file(target_file)
 
         if ref_format == tar_format == "raster":
-
             if not reference.is_coregistered(target):
-                logger.info("Eseguo coregistrazione tra immagini raster")
-
-                target_coreg = target_file.parent/(
-                    target_file.stem + "_coreg" + target_file.suffix)
-
-                basic_pixel_coregistration(str(target_file), str(
-                    reference_file), str(target_coreg))
-
-                logger.info(
-                    f"Coregistrazione eseguita correttamente. File coregistrato: {target_coreg}")
+                logger.info("Eseguo coregistrazione" +
+                            "tra immagini raster")
+                target_coreg = target_file.parent / (target_file.stem +
+                                                     "_coreg" + 
+                                                     target_file.suffix)
+                basic_pixel_coregistration(str(target_file), str(reference_file),
+                                           str(target_coreg))
+                logger.info("Coregistrazione eseguita correttamente." +
+                            f" File coregistrato: {target_coreg}")
+                
                 _, target = load_file(target_coreg)
-
             else:
                 logger.info("Immagini raster già coregistrate.")
-
         else:
             logger.info("Immagini di input non raster")
-
             if not reference.is_coregistered(target):
-                raise ValueError(
-                    "Le immagini di input hanno dimensioni diverse")
-
+                logger.warning("La coregistrazione tra immagini non georiferite ")
             else:
-                logger.info(
-                    "Le immagini di input presentano le medesime dimensioni")
-
+                logger.info("Le immagini di input presentano le medesime dimensioni")
         return reference, target
 
 
-def print_summary_statistics(array):
-    print(f"\n{'<'*15}| STATS |{'>'*15}")
-    print(f"              Mean: {np.mean(array): .3g}")
-    print(f"            Median: {np.median(array): .3g}")
-    print(f"Standard Deviation: {np.std(array): .3g}")
-    print(f"           Minimum: {np.min(array): .3g}")
-    print(f"           Maximum: {np.max(array): .3g}")
-    print(f"   25th Percentile: {np.percentile(array, 25): .3g}")
-    print(f"   75th Percentile: {np.percentile(array, 75): .3g}")
+def _summary_statistics(array):
+    logger.debug(f"{'OT Media':>22s}: {np.mean(array): .3g}")
+    logger.debug(f"{'OT Mediana':>22s}: {np.median(array): .3g}")
+    logger.debug(f"{'OT STD':>22s}: {np.std(array): .3g}")
+    logger.debug(f"{'OT Minimo':>22s}: {np.min(array): .3g}")
+    logger.debug(f"{'OT Massimo':>22s}: {np.max(array): .3g}")
+    logger.debug(f"{'OT 25° perc.':>22s}: {np.percentile(array, 25): .3g}")
+    logger.debug(f"{'OT 75° perc.':>22s}: {np.percentile(array, 75): .3g}")
 
 
 def main() -> None:
-    import warnings
-
-    warnings.filterwarnings("ignore")
-
     args = get_parser().parse_args()
 
     method = get_method(args.algname)
     algorithm = method.from_dict(vars(args))
-    logger.info(f"Algoritmo {algorithm.__class__.__name__}")
-    algorithm.toJSON()
 
-    dispatcher = registration()
+    logger.info(f"AVVIO ANALISI OT CON METODO {algorithm.__class__.__name__}")
+
+    algorithm.toJSON()  # salvo parametri utilizzati
+
     reference, target = load_images(args.reference, args.target)
 
     prep_imgs = list()
     for img in (reference, target):
         match algorithm.library:
             case "OpenCV":
-                info_ = f"Esecuzione {args.preprocessing.upper()} mediante libreria OpenCV"
+                info_ = f"Applicazione {args.preprocessing.upper()} mediante libreria OpenCV"
                 logger.info(info_)
 
                 output = dispatcher.dispatch_process(
@@ -184,7 +174,7 @@ def main() -> None:
                 prep_imgs.append(output)
 
             case "scikit-image":
-                info_ = f"Esecuzione {args.preprocessing.upper()} mediante libreria scikit-image"
+                info_ = f"Applicazione {args.preprocessing.upper()} mediante libreria scikit-image"
                 logger.info(info_)
 
                 output = dispatcher.dispatch_process(
@@ -199,8 +189,8 @@ def main() -> None:
     logger.info(
         f"Algoritmo {algorithm.__class__.__name__} eseguito correttamente")
     logger.info(f"Esporto su file: {args.output}")
-    
-    print_summary_statistics(displacements)
+
+    _summary_statistics(displacements)
 
 
 if __name__ == "__main__":

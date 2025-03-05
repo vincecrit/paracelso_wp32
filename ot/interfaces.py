@@ -16,11 +16,6 @@ Functions:
     - Image.bandnames: Get a tuple of the band names.
     - Image.split_channels: Split the image into its individual channels.
     - Image.is_coregistered: Check if the image is coregistered with another image.
-    - Image.minmax_norm: Normalize the image bands using min-max normalization.
-    - Image.zscore_norm: Normalize the image bands using z-score normalization.
-    - Image.log_norm: Normalize the image bands using logarithmic transformation.
-    - Image._normalize: Normalize the image using OpenCV normalization.
-    - Image.to_single_band: Convert an RGB image to grayscale using specified coefficients.
     - Image.get_band: Get a specific band from the image.
     - OTAlgorithm.library: libreria di appartenenza.
     - OTAlgorithm.from_dict: Create an instance from a dictionary.
@@ -42,6 +37,26 @@ import numpy as np
 from rasterio import CRS, Affine
 
 logger = logging.getLogger(__name__)
+
+
+class PreprocessDispatcher:
+    def __init__(self):
+        self.processes = dict()
+
+    def register(self, name: str, process):
+        if name not in self.processes:
+            self.processes[name] = list()
+        self.processes[name].append(process)
+
+    def dispatch_process(self, name: str, **kwargs):
+        if not name in self.processes:
+            logger.critical(
+                f"Il metodo {name.upper()} non è tra quelli registrati.")
+            exit(0)
+        else:
+            for process in self.processes[name]:
+                return process(**kwargs)
+
 
 class Image:
     """Class representing an image with multiple bands."""
@@ -81,15 +96,15 @@ class Image:
 
     def __repr__(self): return f"{self.image}\n{self.affine}\n{self.crs}"
     def __len__(self): return self.count
-    
+
     def __iter__(self):
         for band in self.bandnames:
             yield self.__getattribute__(band)
-        
+
     def __getitem__(self, __index):
         name = list(self.bandnames)[__index]
         return self.__getattribute__(name)
-    
+
     @classmethod
     def __get_bandnames(cls, n): return tuple(f"B{i+1}" for i in range(n))
 
@@ -149,11 +164,12 @@ class Image:
         if all([self.affine is not None, __other.affine is not None]):
             return self.affine == __other.affine
         elif any([self.affine is not None, __other.affine is not None]):
-            raise ValueError("Una delle due immagini non possiede georeferenziazione")
+            raise ValueError(
+                "Una delle due immagini non possiede georeferenziazione")
         else:
-            Warning("Il controllo di coregistrazione per immagini non raster è molto approssimativo.")
+            Warning(
+                "Il controllo di coregistrazione per immagini non raster è molto approssimativo.")
             return self.shape == __other.shape
-
 
     def get_band(self, n: str | int | None = None):
         """
@@ -162,11 +178,11 @@ class Image:
         if n in self.bandnames:
             band = self.__getattribute__(n)
             return Image(band, self.affine, self.crs, self.nodata)
-        
+
         elif isinstance(n, int):
             band = self[n]
             return Image(band, self.affine, self.crs, self.nodata)
-        
+
         elif n is None:
             return self
 

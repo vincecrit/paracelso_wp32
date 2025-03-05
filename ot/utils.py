@@ -5,23 +5,7 @@ import numpy as np
 import rasterio
 from rasterio.warp import Resampling, calculate_default_transform, reproject
 
-from ot.image_processing import opencv, ski
-
 logger = logging.getLogger(__name__)
-
-
-class PreprocessDispatcher:
-    def __init__(self):
-        self.processes = dict()
-
-    def register(self, name: str, process):
-        if name not in self.processes:
-            self.processes[name] = list()
-        self.processes[name].append(process)
-
-    def dispatch_process(self, name: str, **kwargs):
-        for process in self.processes[name]:
-            return process(**kwargs)
 
 
 def basic_pixel_coregistration(infile: str, match: str, outfile: str) -> None:
@@ -92,16 +76,3 @@ def load_raster(source: str, band: int | None = None) -> np.ndarray:
 def cv2imread(*args, **kwargs):
     logger.debug("Caricamento immagini con OpenCV")
     return cv2.imread(*args, **kwargs)
-
-
-def registration():
-    dispatcher = PreprocessDispatcher()
-
-    dispatcher.register("cv2_clahe", opencv.clahe)
-    dispatcher.register("ski_clahe", ski.clahe)
-    dispatcher.register("cv2_equalize", opencv.equalize)
-    dispatcher.register("ski_equalize", ski.equalize)
-    dispatcher.register("cv2_lognorm", opencv.lognorm)
-    dispatcher.register("ski_lognorm", ski.lognorm)
-
-    return dispatcher

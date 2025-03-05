@@ -56,11 +56,11 @@ def _is_multiband(array) -> bool:
 
 def _normalize(array, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8U):
     logger.debug(
-        f"Normalzizzo immagine in range: {alpha}-{beta}."+
-        f" Normalizzazione: {cv2.NORM_MINMAX=}."+
+        f"Normalizzo immagine in range: ({alpha},{beta})." +
+        f" Normalizzazione: {cv2.NORM_MINMAX=}." +
         f" Formato in uscita: {dtype}")
-    
-    return cv2.normalize(array, dst=None, alpha=alpha, beta=beta, 
+
+    return cv2.normalize(array, dst=None, alpha=alpha, beta=beta,
                          norm_type=norm_type, dtype=dtype)
 
 
@@ -94,30 +94,3 @@ def np2cv(array, **kwargs) -> np.ndarray:
         array = cv2.cvtColor(array, cv2.COLOR_BGR2GRAY)
 
     return array
-
-
-# def norm_minmax(band, mask=None, nodata: int | float | None = np.nan):
-#     """Normalize a band by its minimum and maximum values, maintaining NoData values."""
-
-#     if mask is None:
-#         mask = np.zeros_like(band).astype(bool)
-
-#     valid_pixels = band[~mask]
-#     min_val, max_val = np.min(valid_pixels), np.max(valid_pixels)
-#     normalized = (band - min_val) / (max_val - min_val)
-#     normalized[mask] = nodata  # Mantieni NoData
-
-#     return normalized
-
-
-# def norm_zscore(band, mask=None, nodata: int | float | None = np.nan):
-#     """Normalize a band using z-score normalization, maintaining NoData values."""
-#     if mask is None:
-#         mask = np.zeros_like(band).astype(bool)
-
-#     valid_pixels = band[~mask]
-#     mean, std = np.mean(valid_pixels), np.std(valid_pixels)
-#     normalized = (band - mean) / std
-#     normalized[mask] = nodata
-
-#     return normalized
