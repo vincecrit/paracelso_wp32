@@ -28,6 +28,7 @@ from ot.interfaces import Image, OTAlgorithm
 
 logger = logging.getLogger(__name__)
 
+
 def stepped_rolling_window(array_2d: np.ndarray, window_shape: tuple[int], step: int):
     """
     Restituisce le finestre mobili dell'array di input utilizzando la funzione
@@ -216,7 +217,7 @@ class SkiOpticalFlowILK(OTAlgorithm):
     Wrapper for scikit-image's optical_flow_ilk function.
     """
 
-    library = 'scikit-image'
+    library = 'skimage'
 
     def __init__(self, radius=7,
                  num_warp=10, gaussian=False, prefilter=False):
@@ -253,7 +254,7 @@ class SkiOpticalFlowTVL1(OTAlgorithm):
     Wrapper for scikit-image's optical_flow_tvl1 function
     """
 
-    library = 'scikit-image'
+    library = 'skimage'
 
     def __init__(self, attachment=15, tightness=0.3,
                  num_warp=5, num_iter=10, tol=1e-4, prefilter=False):
@@ -297,7 +298,7 @@ class SkiPCC_Vector(OTAlgorithm):
     Wrapper for phase cross-correlation vector calculation.
     """
 
-    library = 'scikit-image'
+    library = 'skimage'
 
     def __init__(self, winsize: tuple[int] | int,
                  step_size: tuple[int] | int,
