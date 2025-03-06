@@ -1,5 +1,6 @@
 import argparse
 from pathlib import Path
+import time
 
 import cv2
 import numpy as np
@@ -14,12 +15,13 @@ from ot.helpmsg import (ALGNAME, ATTACHMENT, BAND, CLAHE, FLAGS, FLOW,
 from ot.image_processing import dispatcher
 from ot.interfaces import Image
 from ot.metodi import get_method
-from ot.utils import basic_pixel_coregistration, cv2imread, load_raster
+from ot.utils import basic_pixel_coregistration, cv2imread, rasterio_open, is_identity_affine
 
 
-def get_parser() -> argparse.ArgumentParser:
+def get_parser() -> argparse.ArgumentParser:  # cosa faccio con questo mostro?
     """Get the argument parser for the script."""
-    parser = argparse.ArgumentParser(description="Optical flow")
+    parser = argparse.ArgumentParser(
+        description="Offset-Tracking PARACELSO WP3.2")
 
     # parametri comuni
     parser.add_argument("-ot", "--algname", help=ALGNAME, type=str)
@@ -29,7 +31,8 @@ def get_parser() -> argparse.ArgumentParser:
                         default="output.tif", type=str)
     parser.add_argument("-b", "--band", help=BAND, default=None, type=str)
     parser.add_argument("--nodata", help=NODATA, default=None, type=float)
-    parser.add_argument("--preprocessing", default=None, type=str)
+    parser.add_argument("-prep", "--preprocessing", default=None, type=str)
+    parser.add_argument("--out_format", default=None, type=str)
 
     # parametri OpenCV
     parser.add_argument("--flow", help=FLOW, default=None)
@@ -62,85 +65,106 @@ def get_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def output(img: Image, filename: str | Path, *args, **kwargs) -> None:
+    filename = Path(filename)
+
+    if filename.is_file():
+        logger.warning(f"Il file {filename} esiste, verrà sovrascritto " +
+                       "a meno che tu non prema CTRL+C entro 2 secondi")
+        time.sleep(2)
+
+    match filename.suffix:
+        case ".tif": ...  # output per raster
+        case ".tiff": ...  # output per raster
+        case ".jpg": ...  # output per immagine
+        case ".jpeg": ...  # output per immagine
+        case ".png": ...  # output per immagine
+
+
 def load_file(source, **kwargs):
+    # forse si può fare a meno di averla, è diventata un
+    #  wrap-up di `ot.utils.rasterio_open`
     source = Path(source)
 
     if not source.is_file():
         logger.critical(f"Il file {source} non esiste")
         exit(0)
 
-    match source.suffix:
-        case ".tif":
-            dataset, affine, crs = load_raster(source, **kwargs)
-            img_format = "raster"
-        case ".tiff":
-            dataset, affine, crs = load_raster(source, **kwargs)
-            img_format = "raster"
-        case ".jpg":
-            dataset = cv2imread(source, cv2.COLOR_BGR2RGB)
-            affine = None
-            crs = None
-            img_format = "generic"
-        case ".jpeg":
-            dataset = cv2imread(source, cv2.COLOR_BGR2RGB)
-            affine = None
-            crs = None
-            img_format = "generic"
-        case ".png":
-            dataset = cv2imread(source, cv2.COLOR_BGR2RGB)
-            affine = None
-            crs = None
-            img_format = "generic"
-
-    return img_format, Image(dataset, affine, crs)
+    return Image(*rasterio_open(source, **kwargs))
 
 
 def load_images(*args):
-    try:
-        reference_file, target_file = [Path(src) for src in args]
+    """
+    Carica una coppia di immagini e resituisce una coppia di oggetti 
+    `ot.interfaces.Image`.
 
-    except ValueError as err:
-        logger.critical(f"Troppi argomenti di input (attesi 2)")
-        logger.debug(f"{err}")
-        exit(0)
+    Info:
+        Operazioni eseguite:
+        1. Controllo estensione dei file
+        2. Controllo georeferenziazione
+        3. Coregistrazione di immagini
+        4. Output (oggetti `ot.interfaces.Image`)
 
+    Args:
+        *args(str): percorsi delle immagini di reference e target, in quest'ordine
+
+    Returns:
+        tuple(ot.interfaces.Image):
+    """
+    #  [1] Creo oggetti Path
+    reference_file, target_file = [Path(src) for src in args]
     logger.info(f"REFERENCE: {reference_file.name}")
     logger.info(f"TARGET: {target_file.name}")
 
+    # file con estensione diversa non sono accettati
     if not reference_file.suffix == target_file.suffix:
         logger.critical("Le due immagini hanno formati diversi")
         logger.debug(f"{reference_file.suffix=}, {target_file.suffix=}")
         exit(0)
 
     else:
-        ref_format, reference = load_file(reference_file)
-        tar_format, target = load_file(target_file)
+        # carico qualsiasi tipo di file con rasterio (tanto legge tutto mwaahahah)
+        reference = load_file(reference_file)
+        target = load_file(target_file)
 
-        if ref_format == tar_format == "raster":
-            if not reference.is_coregistered(target):
-                logger.info("Eseguo coregistrazione" +
-                            "tra immagini raster")
-                target_coreg = target_file.parent / (target_file.stem +
-                                                     "_coreg" + 
-                                                     target_file.suffix)
-                basic_pixel_coregistration(str(target_file), str(reference_file),
-                                           str(target_coreg))
-                logger.info("Coregistrazione eseguita correttamente." +
-                            f" File coregistrato: {target_coreg}")
-                
-                _, target = load_file(target_coreg)
-            else:
-                logger.info("Immagini raster già coregistrate.")
+        # [2] rasterio associa un oggetto Affine come matrice identità quando la
+        # georeferenziazione non è definita
+        identity_affines = [is_identity_affine(
+            e.affine) for e in (reference, target)]
+
+        # Se nessuno dei file è georiferito non dovrebbero esserci problemi (credo)
+        if all(identity_affines):
+            logger.warning("Nessuno dei due file possiede una georeferenziazione. " +
+                           "La coregistrazione si limiterà ad allinerare/scalare i pixel " +
+                           "dell'immagine target")
+            pass
+
+        # Se la georeferenziazione definita solo per uno dei due file, non
+        # so che fare... Quindi lo butto fuori.
+        elif any(identity_affines):
+            logger.critical(
+                "Uno dei due file non possiede la georeferenziazione.")
+            logger.debug(f"{is_identity_affine(reference.affine)=}")
+            logger.debug(f"{is_identity_affine(target.affine)=}")
+            exit(0)
+
+        # [3] Coregistrazione delle immagini
         else:
-            logger.info("Immagini di input non raster")
             if not reference.is_coregistered(target):
-                logger.warning("La coregistrazione tra immagini non georiferite ")
+                logger.info("Eseguo coregistrazione tra immagini raster")
+                target_coreg = basic_pixel_coregistration(str(target_file),
+                                                          str(reference_file))
+                logger.info(f"Coregistrazione eseguita correttamente" +
+                            f"File coregistrato: {target_coreg}")
+                target = load_file(target_coreg)
             else:
-                logger.info("Le immagini di input presentano le medesime dimensioni")
+                # non succede mai in realtà
+                logger.info("Immagini raster già coregistrate.")
+
         return reference, target
 
 
-def _summary_statistics(array):
+def _summary_statistics(array):  # For fun
     logger.debug(f"{'OT Media':>22s}: {np.mean(array): .3g}")
     logger.debug(f"{'OT Mediana':>22s}: {np.median(array): .3g}")
     logger.debug(f"{'OT STD':>22s}: {np.std(array): .3g}")
@@ -151,46 +175,54 @@ def _summary_statistics(array):
 
 
 def main() -> None:
+    # Argomenti di input da CMD
     args = get_parser().parse_args()
 
+    # accedo alla classe di algoritmo scelta
     method = get_method(args.algname)
+
+    # parametrizzo l'algoritmo
     algorithm = method.from_dict(vars(args))
+
+    # salvo parametri utilizzati in formato JSON
+    algorithm.toJSON()
 
     logger.info(f"AVVIO ANALISI OT CON METODO {algorithm.__class__.__name__}")
 
-    algorithm.toJSON()  # salvo parametri utilizzati
-
     reference, target = load_images(args.reference, args.target)
 
-    prep_imgs = list()
+    preprocessed_images = list()
+    # Applico la stessa funzione di pre-processing ad entrambe le immagini
     for img in (reference, target):
-        match algorithm.library:
-            case "OpenCV":
-                info_ = f"Applicazione {args.preprocessing.upper()} mediante libreria OpenCV"
-                logger.info(info_)
+        # Esecuzione pre-processing. Oggetto `dispatcher` restituisce la versione della
+        # funzione di preprocessing adattata alle specifiche della libreria sulla quale
+        # l'algoritmo scelto è basato (OpenCV o skimage)
 
-                output = dispatcher.dispatch_process(
-                    "cv2_"+args.preprocessing, array=img)
-                prep_imgs.append(output)
+        info_ = f"Applicazione {args.preprocessing.upper()} mediante" +\
+            f"libreria {algorithm.library}"
+        logger.info(info_)
 
-            case "scikit-image":
-                info_ = f"Applicazione {args.preprocessing.upper()} mediante libreria scikit-image"
-                logger.info(info_)
-
-                output = dispatcher.dispatch_process(
-                    "ski_"+args.preprocessing, array=img)
-                prep_imgs.append(output)
+        output = dispatcher.dispatch_process(
+            f"{algorithm.library}_"+args.preprocessing, array=img)
+        preprocessed_images.append(output)
 
     logger.info(f"{args.preprocessing.upper()} eseguito correttamente.")
+    logger.debug(f"Output {args.preprocessing.upper()}:" +
+                 f"{[type(e) for e in preprocessed_images]}")
 
-    logger.debug(
-        f"Output {args.preprocessing.upper()}: {[type(e) for e in prep_imgs]}")
-    displacements = algorithm(*prep_imgs)
+    # Eseguo offset-tracking
+    displacements = algorithm(*preprocessed_images)
+
     logger.info(
         f"Algoritmo {algorithm.__class__.__name__} eseguito correttamente")
     logger.info(f"Esporto su file: {args.output}")
 
+    # restituisco statitische campo di spostamenti (probabilmente lo elimino)
     _summary_statistics(displacements)
+
+    # TODO output della mappa di spostamento.
+    # Formato di output può essere scelto in funzione dell'estensione dell'argomento `--output`
+    # oppure espresso attraverso un argomento specifico (--out_format??)
 
 
 if __name__ == "__main__":

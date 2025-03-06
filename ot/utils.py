@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 
 import cv2
 import numpy as np
@@ -8,9 +9,15 @@ from rasterio.warp import Resampling, calculate_default_transform, reproject
 logger = logging.getLogger(__name__)
 
 
-def basic_pixel_coregistration(infile: str, match: str, outfile: str) -> None:
+def basic_pixel_coregistration(infile: str, match: str,
+                               outfile: str | None = None) -> Path:
     """Align pixels between a target image (infile) and a reference image (match).
     Optionally, reproject to the same CRS as 'match'."""
+    
+    if outfile is None:
+        out_stem = Path(infile).stem + "_coreg" + Path(infile).suffix
+        outfile = Path(infile).parent / out_stem
+    
     with rasterio.open(infile) as src:
         src_transform = src.transform
         nodata = src.meta['nodata']
@@ -50,13 +57,30 @@ def basic_pixel_coregistration(infile: str, match: str, outfile: str) -> None:
                           dst_transform=dst_transform,
                           dst_crs=dst_crs,
                           resampling=Resampling.bilinear)
+        
+        return outfile
+    
+
+def is_identity_affine(affine: rasterio.Affine) -> bool:
+    matrix = np.array(affine).reshape(3, 3)
+    if (np.diagonal(matrix) == 1).all():
+        return True
+    else:
+        return False
 
 
-def load_raster(source: str, band: int | None = None) -> np.ndarray:
-    logger.debug("Caricamento dataset raster con rasterio")
+def rasterio_open(source: str, band: int | None = None) -> np.ndarray:
+    logger.info("Caricamento dataset raster")
+    logger.debug(f"Caricamento {source} con rasterio.")
+
     with rasterio.open(source) as src:
         if band is None:
             iter_bands = range(src.count)
+        elif band > (src.count - 1):
+            logging.critical(f"La banda selezionata non esiste. "+
+                                f"Numero bande dataset: {src.count}. "+
+                                "Gli indici delle bande partono da zero")
+            exit(0)
         else:
             iter_bands = [band]
 
@@ -66,11 +90,11 @@ def load_raster(source: str, band: int | None = None) -> np.ndarray:
             band[band == src.meta['nodata']] = 0
             channels.append(band)
 
-        dataset = cv2.merge(channels)
-        affine = src.meta['transform']
-        crs = src.meta['crs']
+    dataset = cv2.merge(channels)
+    affine = src.meta['transform']
+    crs = src.meta['crs']
 
-        return dataset, affine, crs
+    return dataset, affine, crs
 
 
 def cv2imread(*args, **kwargs):
