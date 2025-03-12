@@ -1,6 +1,7 @@
 import argparse
 import time
 from pathlib import Path
+import time
 
 import cv2
 import numpy as np
@@ -181,6 +182,7 @@ def _summary_statistics(array):  # For fun
     
 
 def main() -> None:
+    # Argomenti di input da CMD
     args = get_parser().parse_args()
     algorithm = get_method(args.algname).from_dict(vars(args))
     algorithm.toJSON()
@@ -195,6 +197,7 @@ def main() -> None:
     displacements = algorithm(*preprocessed_images)
     logger.info(f"Algoritmo {algorithm.__class__.__name__} eseguito correttamente")
 
+    # restituisco statitische campo di spostamenti (probabilmente lo elimino)
     _summary_statistics(displacements)
 
     try:

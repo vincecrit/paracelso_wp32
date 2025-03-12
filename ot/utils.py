@@ -93,6 +93,16 @@ def basic_pixel_coregistration(infile: str, match: str,
                           dst_transform=dst_transform,
                           dst_crs=dst_crs,
                           resampling=Resampling.bilinear)
+        
+        return outfile
+    
+
+def is_identity_affine(affine: rasterio.Affine) -> bool:
+    matrix = np.array(affine).reshape(3, 3)
+    if (np.diagonal(matrix) == 1).all():
+        return True
+    else:
+        return False
 
         return outfile
 
