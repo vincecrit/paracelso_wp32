@@ -149,6 +149,12 @@ class Image:
     @property
     def shape(self): return self.get_band(0).image.shape
 
+    @property
+    def height(self): return self.get_band(0).image.shape[0]
+
+    @property
+    def width(self): return self.get_band(0).image.shape[1]
+
     def split_channels(self):
         """Split the image into its individual channels."""
         imgs = list()

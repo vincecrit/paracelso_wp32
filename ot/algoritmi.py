@@ -102,6 +102,11 @@ def xcorr_to_frame(ref: Image, tar: Image,
     logger.debug(f"{ref.shape = }, {ref.image.dtype = }")
     logger.debug(f"{tar.shape = }, {tar.image.dtype = }")
 
+    if ref.crs is None:
+        CRS = None
+    else:
+        CRS = ref.crs.to_string()
+
     if isinstance(win_size, int):
         win_size = win_size, win_size
 
@@ -126,7 +131,7 @@ def xcorr_to_frame(ref: Image, tar: Image,
         transfomer = AffineTransformer(ref.affine)
         df *= ref.affine.a  # pixel -> metri
         coords = np.c_[transfomer.xy(*index.T)]
-        geom = points_from_xy(*zip(*coords), crs=ref.crs.to_string())
+        geom = points_from_xy(*zip(*coords), crs=CRS)
 
         return gpd.GeoDataFrame(df, geometry=geom)
 
@@ -204,10 +209,10 @@ class OpenCVOpticalFlow(OTAlgorithm):
                                                      poly_sigma=self.poly_sigma,
                                                      flags=self.flags)
 
-        logger.debug(f"Tipo output: {pixel_offsets.dtype}")
-        logger.debug(f"Shape output: {pixel_offsets.shape}")
-
         displ = self._to_displacements(target.affine, pixel_offsets)
+
+        logger.debug(f"Tipo output: {displ.dtype}")
+        logger.debug(f"Shape output: {displ.shape}")
 
         return Image(displ, target.affine, target.crs, target.nodata)
 

@@ -9,10 +9,12 @@ import logging
 
 import cv2
 import numpy as np
+from skimage import color
 
 from ot.interfaces import Image
 
 logger = logging.getLogger(__name__)
+DEFAULT_NODATA = 0
 
 
 def _array_verbose(array: np.ndarray) -> np.ndarray:
@@ -50,8 +52,7 @@ def _is_cv8u(array) -> bool:
     return _np_to_cv2_dtype(array) == cv2.CV_8U
 
 
-def _is_multiband(array) -> bool:
-    return array.ndim > 2
+def _is_multiband(array) -> bool: return array.ndim > 2
 
 
 def _normalize(array, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8U):
@@ -71,26 +72,31 @@ def _toCV8U(array: np.ndarray) -> np.ndarray:
     return _normalize(array, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8U)
 
 
-def _overwrite_nodata(array, nodata: int | float = -9999.,
-                      DEFAULT_NODATA: int | float = 0) -> np.ndarray:
+def _get_nodata_mask(array, nodata: int | float = -9999.) -> np.ndarray:
     logger.debug(
-        f"Valori pari a {nodata} intesi come NULLI (sovrascritti come DEFAULT_NODATA)")
+        f"Valori pari a {nodata} intesi come valori NULLI")
+    return (array == nodata).any(axis=-1)
+
+
+def _overwrite_nodata(array, nodata: int | float = -9999.) -> np.ndarray:
+    logger.debug(
+        f"Valori pari a {nodata} intesi come valori NULLI (sovrascritti come DEFAULT_NODATA)")
     array = array.copy()
     array[array == nodata] = DEFAULT_NODATA
     return array
 
 
-def np2cv(array, **kwargs) -> np.ndarray:
+def to_single_band_uint8(array, **kwargs) -> np.ndarray:
 
     _array_verbose(array)
     array = _overwrite_nodata(array, **kwargs)
 
     if not _is_cv8u(array):
         logger.debug("Converto dtype in CV_8U")
-        array = _toCV8U(array)
+        array = _normalize(array)
 
     if _is_multiband(array):
         logger.debug("Array multibanda (ndim > 2)")
-        array = cv2.cvtColor(array, cv2.COLOR_BGR2GRAY)
+        array = _normalize(color.rgb2gray(array))
 
     return array

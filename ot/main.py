@@ -1,6 +1,6 @@
 import argparse
-from pathlib import Path
 import time
+from pathlib import Path
 
 import cv2
 import numpy as np
@@ -15,7 +15,9 @@ from ot.helpmsg import (ALGNAME, ATTACHMENT, BAND, CLAHE, FLAGS, FLOW,
 from ot.image_processing import dispatcher
 from ot.interfaces import Image
 from ot.metodi import get_method
-from ot.utils import basic_pixel_coregistration, cv2imread, rasterio_open, is_identity_affine
+from ot.utils import (DriverCapabilityError, RasterioIOError,
+                      basic_pixel_coregistration, geopandas_to_gpkg, _is_identity_affine,
+                      rasterio_read, image_to_raster)
 
 
 def get_parser() -> argparse.ArgumentParser:  # cosa faccio con questo mostro?
@@ -60,26 +62,29 @@ def get_parser() -> argparse.ArgumentParser:  # cosa faccio con questo mostro?
     parser.add_argument("--upsmp_fac", help=UPSAMPLE_FACTOR,
                         type=float, default=1.0)
 
-    parser
-
     return parser
 
 
-def output(img: Image, filename: str | Path, *args, **kwargs) -> None:
-    filename = Path(filename)
+def write_output(output, outfile: str | Path) -> None:
 
-    if filename.is_file():
-        logger.warning(f"Il file {filename} esiste, verrà sovrascritto " +
-                       "a meno che tu non prema CTRL+C entro 2 secondi")
-        time.sleep(2)
+    outfile = Path(outfile)
 
-    match filename.suffix:
-        case ".tif": ...  # output per raster
-        case ".tiff": ...  # output per raster
-        case ".jpg": ...  # output per immagine
-        case ".jpeg": ...  # output per immagine
-        case ".png": ...  # output per immagine
-
+    match outfile.suffix:
+        case ".tiff":
+            image_to_raster(output, outfile)
+        case ".tif":
+            image_to_raster(output, outfile)
+        case ".jpg":
+            raise NotImplementedError
+        case ".jpeg":
+            raise NotImplementedError
+        case ".png":
+            raise NotImplementedError
+        case ".gpkg":
+            geopandas_to_gpkg(output, outfile)
+        case _:
+            raise NotImplementedError
+        
 
 def load_file(source, **kwargs):
     # forse si può fare a meno di averla, è diventata un
@@ -90,7 +95,7 @@ def load_file(source, **kwargs):
         logger.critical(f"Il file {source} non esiste")
         exit(0)
 
-    return Image(*rasterio_open(source, **kwargs))
+    return Image(*rasterio_read(source, **kwargs))
 
 
 def load_images(*args):
@@ -129,11 +134,12 @@ def load_images(*args):
 
         # [2] rasterio associa un oggetto Affine come matrice identità quando la
         # georeferenziazione non è definita
-        identity_affines = [is_identity_affine(
-            e.affine) for e in (reference, target)]
+        are_identity_affines = [
+            _is_identity_affine(e.affine) for e in (reference, target)
+        ]
 
         # Se nessuno dei file è georiferito non dovrebbero esserci problemi (credo)
-        if all(identity_affines):
+        if all(are_identity_affines):
             logger.warning("Nessuno dei due file possiede una georeferenziazione. " +
                            "La coregistrazione si limiterà ad allinerare/scalare i pixel " +
                            "dell'immagine target")
@@ -141,11 +147,11 @@ def load_images(*args):
 
         # Se la georeferenziazione è definita solo per uno dei due file, non
         # so che fare... Quindi lo butto fuori.
-        elif any(identity_affines):
+        elif any(are_identity_affines):
             logger.critical(
                 "Uno dei due file non possiede la georeferenziazione.")
-            logger.debug(f"{is_identity_affine(reference.affine)=}")
-            logger.debug(f"{is_identity_affine(target.affine)=}")
+            logger.debug(f"{_is_identity_affine(reference.affine)=}")
+            logger.debug(f"{_is_identity_affine(target.affine)=}")
             exit(0)
 
         # [3] Coregistrazione delle immagini
@@ -172,57 +178,33 @@ def _summary_statistics(array):  # For fun
     logger.debug(f"{'OT Massimo':>22s}: {np.max(array): .3g}")
     logger.debug(f"{'OT 25° perc.':>22s}: {np.percentile(array, 25): .3g}")
     logger.debug(f"{'OT 75° perc.':>22s}: {np.percentile(array, 75): .3g}")
-
+    
 
 def main() -> None:
-    # Argomenti di input da CMD
     args = get_parser().parse_args()
-
-    # accedo alla classe di algoritmo scelta
-    method = get_method(args.algname)
-
-    # parametrizzo l'algoritmo
-    algorithm = method.from_dict(vars(args))
-
-    # salvo parametri utilizzati in formato JSON
+    algorithm = get_method(args.algname).from_dict(vars(args))
     algorithm.toJSON()
-
     logger.info(f"AVVIO ANALISI OT CON METODO {algorithm.__class__.__name__}")
 
     reference, target = load_images(args.reference, args.target)
-
-    preprocessed_images = list()
-    # Applico la stessa funzione di pre-processing ad entrambe le immagini
-    for img in (reference, target):
-        # Esecuzione pre-processing. Oggetto `dispatcher` restituisce la versione della
-        # funzione di preprocessing adattata alle specifiche della libreria sulla quale
-        # l'algoritmo scelto è basato (OpenCV o skimage)
-
-        info_ = f"Applicazione {args.preprocessing.upper()} mediante" +\
-            f"libreria {algorithm.library}"
-        logger.info(info_)
-
-        output = dispatcher.dispatch_process(
-            f"{algorithm.library}_"+args.preprocessing, array=img)
-        preprocessed_images.append(output)
+    preprocessed_images = [
+        dispatcher.dispatch_process(f"{algorithm.library}_{args.preprocessing}", array=img)
+        for img in (reference, target)]
 
     logger.info(f"{args.preprocessing.upper()} eseguito correttamente.")
-    logger.debug(f"Output {args.preprocessing.upper()}:" +
-                 f"{[type(e) for e in preprocessed_images]}")
-
-    # Eseguo offset-tracking
     displacements = algorithm(*preprocessed_images)
+    logger.info(f"Algoritmo {algorithm.__class__.__name__} eseguito correttamente")
 
-    logger.info(
-        f"Algoritmo {algorithm.__class__.__name__} eseguito correttamente")
-    logger.info(f"Esporto su file: {args.output}")
-
-    # restituisco statitische campo di spostamenti (probabilmente lo elimino)
     _summary_statistics(displacements)
 
-    # TODO output della mappa di spostamento.
-    # Formato di output può essere scelto in funzione dell'estensione dell'argomento `--output`
-    # oppure espresso attraverso un argomento specifico (--out_format??)
+    try:
+        logger.info(f"Esporto su file: {args.output}")
+        write_output(displacements, args.output)
+
+    except (ValueError, TypeError, RasterioIOError,
+            DriverCapabilityError, NotImplementedError) as err:
+        logger.critical(f"[RASTERIO]{err.__class__.__name__}: {err}")
+        exit(0)
 
 
 if __name__ == "__main__":

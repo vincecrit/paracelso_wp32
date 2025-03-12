@@ -2,22 +2,58 @@ import logging
 from pathlib import Path
 
 import cv2
+import geopandas as gpd
 import numpy as np
 import rasterio
+from rasterio.errors import DriverCapabilityError, RasterioIOError
 from rasterio.warp import Resampling, calculate_default_transform, reproject
 
+from ot.interfaces import Image
+
 logger = logging.getLogger(__name__)
+
+
+def _to_bandlast(arr):
+    '''[BAND, ROW, COL] -> [ROW, COL, BAND]'''
+    return np.transpose(arr, (1,2,0))
+
+
+def __debug_attrerr(func, *args, **kwargs):
+    def inner(*args, **kwargs):
+        try:
+            result = func(*args, **kwargs)
+            return result
+        except AttributeError as err:
+            logger.critical(f"{err.__class__.__name__}: {err.__str__()}")
+        return None
+    return inner
+
+
+def _is_image(arg) -> bool:
+    return isinstance(arg, Image)
+
+
+def _is_geodf(arg) -> bool:
+    return isinstance(arg, gpd.GeoDataFrame)
+
+
+def _is_identity_affine(affine: rasterio.Affine) -> bool:
+    matrix = np.array(affine).reshape(3, 3)
+    if (np.diagonal(matrix) == 1).all():
+        return True
+    else:
+        return False
 
 
 def basic_pixel_coregistration(infile: str, match: str,
                                outfile: str | None = None) -> Path:
     """Align pixels between a target image (infile) and a reference image (match).
     Optionally, reproject to the same CRS as 'match'."""
-    
+
     if outfile is None:
         out_stem = Path(infile).stem + "_coreg" + Path(infile).suffix
         outfile = Path(infile).parent / out_stem
-    
+
     with rasterio.open(infile) as src:
         src_transform = src.transform
         nodata = src.meta['nodata']
@@ -57,37 +93,30 @@ def basic_pixel_coregistration(infile: str, match: str,
                           dst_transform=dst_transform,
                           dst_crs=dst_crs,
                           resampling=Resampling.bilinear)
-        
+
         return outfile
-    
-
-def is_identity_affine(affine: rasterio.Affine) -> bool:
-    matrix = np.array(affine).reshape(3, 3)
-    if (np.diagonal(matrix) == 1).all():
-        return True
-    else:
-        return False
 
 
-def rasterio_open(source: str, band: int | None = None) -> np.ndarray:
-    logger.info("Caricamento dataset raster")
+def rasterio_read(source: str, band: int | None = None) -> np.ndarray:
     logger.debug(f"Caricamento {source} con rasterio.")
 
     with rasterio.open(source) as src:
+        
         if band is None:
-            iter_bands = range(src.count)
+            iter_bands = range(min(3, src.count))
+
         elif band > (src.count - 1):
-            logging.critical(f"La banda selezionata non esiste. "+
-                                f"Numero bande dataset: {src.count}. "+
-                                "Gli indici delle bande partono da zero")
+            logging.critical(f"La banda selezionata non esiste. " +
+                             f"Numero bande dataset: {src.count}. " +
+                             "Gli indici delle bande partono da zero")
             exit(0)
+
         else:
             iter_bands = [band]
 
         channels = []
         for b in iter_bands:
             band = src.read(b+1)
-            band[band == src.meta['nodata']] = 0
             channels.append(band)
 
     dataset = cv2.merge(channels)
@@ -97,6 +126,21 @@ def rasterio_open(source: str, band: int | None = None) -> np.ndarray:
     return dataset, affine, crs
 
 
-def cv2imread(*args, **kwargs):
-    logger.debug("Caricamento immagini con OpenCV")
-    return cv2.imread(*args, **kwargs)
+def image_to_raster(img: Image, outfile) -> None:
+
+    if not _is_image(img):
+        raise ValueError("Tipo di argomento non corretto. " +
+                         f"Atteso `{type(Image)}`, ricevuto `{type(img)}`")
+
+    with rasterio.open(outfile, "w", transform=img.affine, crs=img.crs, nodata=0,
+                       width=img.width, height=img.height, dtype=img.image.dtype, count=1) as ds:
+        ds.write(img.image, 1)
+
+
+def geopandas_to_gpkg(frame, outfile) -> None:
+
+    if not _is_geodf(frame):
+        raise ValueError("Tipo di argomento non corretto. " +
+                         f"Atteso `{type(gpd.GeoDataFrame)}`, ricevuto `{type(frame)}`")
+
+    frame.to_file(outfile, layer="spostamenti")

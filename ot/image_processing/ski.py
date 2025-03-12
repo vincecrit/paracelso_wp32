@@ -120,7 +120,7 @@ def minmax(*, array: np.ndarray) -> np.ndarray:
     """
     Normalize a band by its minimum and maximum values, maintaining NoData values.
     """
-    logger.info("Eseguo trasformata `zscore` con metodi skimage")
+    logger.info("Eseguo normalizzazione rispetto ai valori minimo e massimo")
     common._array_verbose(array)
 
     normalized = _rescale_float_intensity(array, in_range=(array.min(), array.max()))

@@ -24,7 +24,7 @@ def clahe(*, array: np.ndarray, clip_limit: float = 2.,
     logger.info("Eseguo CLAHE con metodi OpenCV")
     common._array_verbose(array)
     
-    array = common.np2cv(array)
+    array = common.to_single_band_uint8(array)
 
     if isinstance(kernel_size, int):
         kernel_size = kernel_size, kernel_size
@@ -40,7 +40,7 @@ def equalize(*, array):
     Basic histogram equalization.
     """
     logger.info("Eseguo cv2.equalizeHist")
-    array = common.np2cv(array=array)
+    array = common.to_single_band_uint8(array=array)
     array = cv2.equalizeHist(array)
     return array
 
@@ -53,7 +53,7 @@ def lognorm(*, array: np.ndarray, gain: float = 1.):
     logger.info("Eseguo trasformazione logaritmica con metodi OpenCV")
     common._array_verbose(array)
 
-    array = common.np2cv(array, nodata=-9999.)
+    array = common.to_single_band_uint8(array, nodata=-9999.)
 
     logger.debug(f"Converto il formato in ingresso in {cv2.CV_32F=} prima della trasformazione logaritmica")
     array = common._normalize(array, 0, 1, dtype=cv2.CV_32F)
@@ -66,7 +66,7 @@ def lognorm(*, array: np.ndarray, gain: float = 1.):
 @common._tofromimage
 def zscore(*, array):
     logger.info("Applico la trasformata zscore con metodi OpenCV")
-    array = common.np2cv(array)
+    array = common.to_single_band_uint8(array)
     common._array_verbose(array)
     
     mean, std = np.mean(array), np.std(array)
@@ -80,4 +80,4 @@ def minmax(*, array):
     logger.info("Scalo le intensità sui valori minimo/massimo con metodi OpenCV")
     common._array_verbose(array)
 
-    return common.np2cv(array)
+    return common.to_single_band_uint8(array)
