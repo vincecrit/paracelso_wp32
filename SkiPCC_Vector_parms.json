@@ -1,6 +1,0 @@
-{
-    "normalization": "phase",
-    "winsize": 5,
-    "step_size": 2,
-    "upsmp_fac": 1.0
-}

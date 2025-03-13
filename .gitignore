@@ -1,4 +1,8 @@
 __pycache__
+*.tiff
+*.log
+*.ps1
+*.bat
 other
 cds
 wp32
