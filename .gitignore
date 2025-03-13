@@ -3,12 +3,9 @@ __pycache__
 *.log
 *.ps1
 *.bat
-other
+logs
 cds
 wp32
 output
 test.py
 note.md
-*.tiff
-*.log
-*.ps1
