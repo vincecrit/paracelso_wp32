@@ -1,9 +1,7 @@
 import argparse
-import time
+import logging
 from pathlib import Path
-import time
 
-import cv2
 import numpy as np
 
 from ot import logger
@@ -17,8 +15,10 @@ from ot.image_processing import dispatcher
 from ot.interfaces import Image
 from ot.metodi import get_method
 from ot.utils import (DriverCapabilityError, RasterioIOError,
-                      basic_pixel_coregistration, geopandas_to_gpkg, _is_identity_affine,
-                      rasterio_read, image_to_raster)
+                      _is_identity_affine, basic_pixel_coregistration,
+                      geopandas_to_gpkg, image_to_raster, rasterio_read)
+
+logger = logging.getLogger(__name__)
 
 
 def get_parser() -> argparse.ArgumentParser:  # cosa faccio con questo mostro?
@@ -34,7 +34,8 @@ def get_parser() -> argparse.ArgumentParser:  # cosa faccio con questo mostro?
                         default="output.tif", type=str)
     parser.add_argument("-b", "--band", help=BAND, default=None, type=str)
     parser.add_argument("--nodata", help=NODATA, default=None, type=float)
-    parser.add_argument("-prep", "--preprocessing", default=None, type=str)
+    parser.add_argument("-prep", "--preprocessing",
+                        default='equalize', type=str)
     parser.add_argument("--out_format", default=None, type=str)
 
     # parametri OpenCV
@@ -83,9 +84,11 @@ def write_output(output, outfile: str | Path) -> None:
             raise NotImplementedError
         case ".gpkg":
             geopandas_to_gpkg(output, outfile)
+        case ".shp":
+            geopandas_to_gpkg(output, outfile)
         case _:
             raise NotImplementedError
-        
+
 
 def load_file(source, **kwargs):
     # forse si può fare a meno di averla, è diventata un
@@ -179,25 +182,26 @@ def _summary_statistics(array):  # For fun
     logger.debug(f"{'OT Massimo':>22s}: {np.max(array): .3g}")
     logger.debug(f"{'OT 25° perc.':>22s}: {np.percentile(array, 25): .3g}")
     logger.debug(f"{'OT 75° perc.':>22s}: {np.percentile(array, 75): .3g}")
-    
+
 
 def main() -> None:
-    # Argomenti di input da CMD
     args = get_parser().parse_args()
     algorithm = get_method(args.algname).from_dict(vars(args))
-    algorithm.toJSON()
     logger.info(f"AVVIO ANALISI OT CON METODO {algorithm.__class__.__name__}")
+
+    algorithm.toJSON()
 
     reference, target = load_images(args.reference, args.target)
     preprocessed_images = [
-        dispatcher.dispatch_process(f"{algorithm.library}_{args.preprocessing}", array=img)
+        dispatcher.dispatch_process(
+            f"{algorithm.library}_{args.preprocessing}", array=img)
         for img in (reference, target)]
 
     logger.info(f"{args.preprocessing.upper()} eseguito correttamente.")
     displacements = algorithm(*preprocessed_images)
-    logger.info(f"Algoritmo {algorithm.__class__.__name__} eseguito correttamente")
+    logger.info(
+        f"Algoritmo {algorithm.__class__.__name__} eseguito correttamente")
 
-    # restituisco statitische campo di spostamenti (probabilmente lo elimino)
     _summary_statistics(displacements)
 
     try:

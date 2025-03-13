@@ -1,23 +1,23 @@
 import logging
 
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-
-ch = logging.StreamHandler()
-fh = logging.FileHandler(filename=__name__+'.log')
-
-ch.setLevel(logging.DEBUG)
-fh.setLevel(logging.DEBUG)
-
-FORMATSTR = "%(asctime)s [%(name)s.%(funcName)s - "+\
+FORMATSTR = "%(message)s"
+FORMATSTR_DEBUG = "%(asctime)s [%(name)s.%(funcName)s - " +\
     "%(lineno)s][%(levelname)s] - %(message)s"
-    
 DATEFMT = "%Y.%m.%d-%H:%M:%S"
 
-formatter = logging.Formatter(FORMATSTR, datefmt=DATEFMT)
+logger = logging.getLogger(__name__)
 
-ch.setFormatter(formatter)
-fh.setFormatter(formatter)
+logger.setLevel(logging.DEBUG)
 
-logger.addHandler(ch)
-logger.addHandler(fh)
+if not logger.handlers:
+    ch = logging.StreamHandler()
+    fh = logging.FileHandler(filename=__name__+'.log')
+
+    ch.setLevel(logging.DEBUG)
+    fh.setLevel(logging.DEBUG)
+
+    ch.setFormatter(logging.Formatter(FORMATSTR_DEBUG))
+    fh.setFormatter(logging.Formatter(FORMATSTR_DEBUG, datefmt=DATEFMT))
+
+    logger.addHandler(ch)
+    logger.addHandler(fh)

@@ -2,6 +2,7 @@ $r = "C:\Users\localadmin\paracelso_wp32\output\D_aoi_calita_S1SLC_DFLTB3_168_20
 $t = "C:\Users\localadmin\paracelso_wp32\output\D_aoi_calita_S1SLC_DFLTB3_168_20250128T045047807536.tif"
 
 .\wp32\Scripts\activate
+python -m ot.main -r $r -t $t -ot SKIOFILK --output CL_2024-2025_ski-ilk.default.tiff
 
 python -m ot.main -r $r -t $t -ot SKIOFILK --preprocessing minmax --output CL_2024-2025_ski-ilk.minmax.tiff
 python -m ot.main -r $r -t $t -ot SKIOFILK --preprocessing zscore --output CL_2024-2025_ski-ilk.zscore.tiff
@@ -17,3 +18,5 @@ python -m ot.main -r $r -t $t -ot OPENCVOF --preprocessing lognorm --output CL_2
 python -m ot.main -r $r -t $t -ot OPENCVOF --preprocessing minmax --output CL_2024-2025_opencv.minmax.tiff
 python -m ot.main -r $r -t $t -ot OPENCVOF --preprocessing zscore --output CL_2024-2025_opencv.zscore.tiff
 python -m ot.main -r $r -t $t -ot OPENCVOF --preprocessing clahe --output CL_2024-2025_opencv.clahe.tiff
+
+del *.tiff

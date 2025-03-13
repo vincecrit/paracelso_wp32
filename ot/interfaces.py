@@ -51,7 +51,7 @@ class PreprocessDispatcher:
     def dispatch_process(self, name: str, **kwargs):
         if not name in self.processes:
             logger.critical(
-                f"Il metodo {name.upper()} non è tra quelli registrati: "+
+                f"Il metodo {name.upper()} non è tra quelli registrati: " +
                 f"{self.processes.keys()}")
             exit(0)
         else:

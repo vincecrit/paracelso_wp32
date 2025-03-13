@@ -1,12 +1,10 @@
 import logging
 
+from ot.image_processing import opencv, ski
 from ot.interfaces import PreprocessDispatcher
-
-from . import opencv, ski
 
 logger = logging.getLogger(__name__)
 
-# registrazione metodi
 dispatcher = PreprocessDispatcher()
 
 for funcname in ski.__all__:

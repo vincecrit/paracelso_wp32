@@ -26,7 +26,7 @@ from tqdm import tqdm
 
 from ot.interfaces import Image, OTAlgorithm
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger()
 
 
 def stepped_rolling_window(array_2d: np.ndarray, window_shape: tuple[int], step: int):

@@ -1,12 +1,12 @@
 import logging
 
 import numpy as np
-from skimage import exposure
-from skimage import color
+from skimage import color, exposure
 
 from ot.image_processing import common
 
 logger = logging.getLogger(__name__)
+
 
 __all__ = [
     "equalize",
@@ -57,8 +57,8 @@ def equalize(*, array: np.ndarray) -> np.ndarray:
 
 @common._tofromimage
 def clahe(*, array: np.ndarray,
-          kernel_size: float | tuple = 10,
-          clip_limit: float = 0.01) -> np.ndarray:
+          kernel_size: float | tuple = 3,
+          clip_limit: float = 0.05) -> np.ndarray:
     """
     Apply Contrast Limited Adaptive Histogram Equalization (CLAHE) to an image.
     Parameters
@@ -84,6 +84,7 @@ def clahe(*, array: np.ndarray,
     processed to prevent multiband issues.
     """
     logger.info("Eseguo skimage.exposure.equalize_adapthist")
+    logger.debug(f"CLAHE finestra mobile: {kernel_size=}")
     common._array_verbose(array)
 
     array = _rescale_float_intensity(array)

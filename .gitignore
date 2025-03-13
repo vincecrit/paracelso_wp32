@@ -6,3 +6,5 @@ output
 test.py
 note.md
 *.tiff
+*.log
+*.ps1

@@ -8,6 +8,7 @@ import rasterio
 from rasterio.errors import DriverCapabilityError, RasterioIOError
 from rasterio.warp import Resampling, calculate_default_transform, reproject
 
+from ot import logger
 from ot.interfaces import Image
 
 logger = logging.getLogger(__name__)
@@ -103,8 +104,6 @@ def is_identity_affine(affine: rasterio.Affine) -> bool:
         return True
     else:
         return False
-
-        return outfile
 
 
 def rasterio_read(source: str, band: int | None = None) -> np.ndarray:
