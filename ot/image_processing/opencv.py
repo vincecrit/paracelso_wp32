@@ -23,8 +23,6 @@ def clahe(*, array: np.ndarray,
     Contrast limited adaptive histogram equalization
     """
     logger.info("Eseguo CLAHE con metodi OpenCV")
-    common._array_verbose(array)
-
     array = common.to_single_band_uint8(array)
 
     if isinstance(kernel_size, int):
