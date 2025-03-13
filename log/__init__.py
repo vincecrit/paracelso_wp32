@@ -16,20 +16,17 @@ def setup_logger(name: str):
     logger = logging.getLogger(name)
     logger.setLevel(LOG_LEVEL)
     
-    # Evita duplicati di handler
-    if not logger.handlers:
-        # Handler per la console
+    # Controlla se gli handler specifici sono già stati aggiunti
+    if not any(isinstance(h, logging.StreamHandler) for h in logger.handlers):
         console_handler = logging.StreamHandler()
         console_handler.setLevel(LOG_LEVEL)
         console_handler.setFormatter(logging.Formatter(LOG_FORMAT))
-        
-        # Handler per il file
+        logger.addHandler(console_handler)
+    
+    if not any(isinstance(h, logging.FileHandler) for h in logger.handlers):
         file_handler = logging.FileHandler(log_path, mode='a')
         file_handler.setLevel(LOG_LEVEL)
         file_handler.setFormatter(logging.Formatter(LOG_FORMAT))
-        
-        # Aggiunge gli handler al logger
-        logger.addHandler(console_handler)
         logger.addHandler(file_handler)
     
     return logger
