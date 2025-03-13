@@ -11,7 +11,6 @@ from enum import Enum, unique
 
 from ot import algoritmi, interfaces
 
-
 @unique
 class AlgFactory(Enum):
     """Factory class for creating algorithm instances."""

@@ -36,7 +36,9 @@ import cv2
 import numpy as np
 from rasterio import CRS, Affine
 
-logger = logging.getLogger(__name__)
+from log import setup_logger
+
+logger = setup_logger(__name__)
 
 
 class PreprocessDispatcher:
@@ -51,7 +53,8 @@ class PreprocessDispatcher:
     def dispatch_process(self, name: str, **kwargs):
         if not name in self.processes:
             logger.critical(
-                f"Il metodo {name.upper()} non è tra quelli registrati.")
+                f"Il metodo {name.upper()} non è tra quelli registrati: " +
+                f"{self.processes.keys()}")
             exit(0)
         else:
             for process in self.processes[name]:
@@ -147,6 +150,12 @@ class Image:
 
     @property
     def shape(self): return self.get_band(0).image.shape
+
+    @property
+    def height(self): return self.get_band(0).image.shape[0]
+
+    @property
+    def width(self): return self.get_band(0).image.shape[1]
 
     def split_channels(self):
         """Split the image into its individual channels."""
