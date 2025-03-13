@@ -1,11 +1,10 @@
-import logging
-
 import numpy as np
 from skimage import color, exposure
 
+from log import setup_logger
 from ot.image_processing import common
 
-logger = logging.getLogger(__name__)
+logger = setup_logger(__name__)
 
 
 __all__ = [

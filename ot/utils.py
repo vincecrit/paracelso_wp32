@@ -8,10 +8,10 @@ import rasterio
 from rasterio.errors import DriverCapabilityError, RasterioIOError
 from rasterio.warp import Resampling, calculate_default_transform, reproject
 
-from ot import logger
+from log import setup_logger
 from ot.interfaces import Image
 
-logger = logging.getLogger(__name__)
+logger = setup_logger(__name__)
 
 
 def _to_bandlast(arr):

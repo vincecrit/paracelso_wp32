@@ -1,11 +1,10 @@
-import logging
-
 import cv2
 import numpy as np
 
+from log import setup_logger
 from ot.image_processing import common
 
-logger = logging.getLogger(__name__)
+logger = setup_logger(__name__)
 
 __all__ = [
     "equalize",

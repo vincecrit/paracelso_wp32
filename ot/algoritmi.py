@@ -10,7 +10,6 @@ Funzioni:
     - stepped_rolling_window: funzione per generazione di finestre mobili.
     - xcorr_to_frame: Esegue la cross-correlazione di immagini e restituisce un GeoDataFrame o DataFrame con i risultati.
 """
-import logging
 from enum import Enum, unique
 
 import cv2
@@ -24,9 +23,10 @@ from skimage.registration import (optical_flow_ilk, optical_flow_tvl1,
 from skimage.util import view_as_windows
 from tqdm import tqdm
 
+from log import setup_logger
 from ot.interfaces import Image, OTAlgorithm
 
-logger = logging.getLogger()
+logger = setup_logger(__name__)
 
 
 def stepped_rolling_window(array_2d: np.ndarray, window_shape: tuple[int], step: int):

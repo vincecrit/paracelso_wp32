@@ -5,15 +5,14 @@ equalizing histograms of image channels, and performing different types of norma
 standard normalization, power transformation, and z-score normalization. Additionally, it offers 
 functions to handle raster data using the rasterio library.
 """
-import logging
-
 import cv2
 import numpy as np
 from skimage import color
 
+from log import setup_logger
 from ot.interfaces import Image
 
-logger = logging.getLogger(__name__)
+logger = setup_logger(__name__)
 
 DEFAULT_NODATA = np.nan
 

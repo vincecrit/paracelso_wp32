@@ -4,7 +4,7 @@ from pathlib import Path
 
 import numpy as np
 
-from ot import logger
+from log import setup_logger
 from ot.helpmsg import (ALGNAME, ATTACHMENT, BAND, CLAHE, FLAGS, FLOW,
                         GAUSSIAN, ITERATIONS, LEVELS, LOGNORM, MINMAX, NODATA,
                         NORMALIZE, NUMITER, NUMWARP, OUTPUT, PHASENORM, POLY_N,
@@ -18,7 +18,7 @@ from ot.utils import (DriverCapabilityError, RasterioIOError,
                       _is_identity_affine, basic_pixel_coregistration,
                       geopandas_to_gpkg, image_to_raster, rasterio_read)
 
-logger = logging.getLogger(__name__)
+logger = setup_logger(__name__)
 
 
 def get_parser() -> argparse.ArgumentParser:  # cosa faccio con questo mostro?

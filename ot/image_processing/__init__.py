@@ -1,9 +1,8 @@
-import logging
-
+from log import setup_logger
 from ot.image_processing import opencv, ski
 from ot.interfaces import PreprocessDispatcher
 
-logger = logging.getLogger(__name__)
+logger = setup_logger(__name__)
 
 dispatcher = PreprocessDispatcher()
 
