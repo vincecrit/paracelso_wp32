@@ -15,19 +15,23 @@ log_path = os.path.join(log_dir, LOG_FILE)
 def setup_logger(name: str):
     logger = logging.getLogger(name)
     logger.setLevel(LOG_LEVEL)
+    logger.propagate = False  # Evita la propagazione ai logger superiori
     
-    # Controlla se gli handler specifici sono già stati aggiunti
-    if not any(isinstance(h, logging.StreamHandler) for h in logger.handlers):
-        console_handler = logging.StreamHandler()
-        console_handler.setLevel(LOG_LEVEL)
-        console_handler.setFormatter(logging.Formatter(LOG_FORMAT))
-        logger.addHandler(console_handler)
+    # Rimuove eventuali handler duplicati
+    if logger.hasHandlers():
+        logger.handlers.clear()
     
-    if not any(isinstance(h, logging.FileHandler) for h in logger.handlers):
-        file_handler = logging.FileHandler(log_path, mode='a')
-        file_handler.setLevel(LOG_LEVEL)
-        file_handler.setFormatter(logging.Formatter(LOG_FORMAT))
-        logger.addHandler(file_handler)
+    # Handler per la console
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(LOG_LEVEL)
+    console_handler.setFormatter(logging.Formatter(LOG_FORMAT))
+    logger.addHandler(console_handler)
+    
+    # Handler per il file
+    file_handler = logging.FileHandler(log_path, mode='a')
+    file_handler.setLevel(LOG_LEVEL)
+    file_handler.setFormatter(logging.Formatter(LOG_FORMAT))
+    logger.addHandler(file_handler)
     
     return logger
 
