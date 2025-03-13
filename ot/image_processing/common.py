@@ -13,7 +13,9 @@ from skimage import color
 
 from ot.interfaces import Image
 
-logger = logging.getLogger(__name__)
+from log import setup_logger
+
+logger = setup_logger()
 
 DEFAULT_NODATA = np.nan
 

@@ -18,7 +18,9 @@ from ot.utils import (DriverCapabilityError, RasterioIOError,
                       _is_identity_affine, basic_pixel_coregistration,
                       geopandas_to_gpkg, image_to_raster, rasterio_read)
 
-logger = logging.getLogger(__name__)
+from log import setup_logger
+
+logger = setup_logger()
 
 
 def get_parser() -> argparse.ArgumentParser:  # cosa faccio con questo mostro?

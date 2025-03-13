@@ -5,7 +5,9 @@ from skimage import color, exposure
 
 from ot.image_processing import common
 
-logger = logging.getLogger(__name__)
+from log import setup_logger
+
+logger = setup_logger()
 
 
 __all__ = [

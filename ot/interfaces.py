@@ -36,6 +36,10 @@ import cv2
 import numpy as np
 from rasterio import CRS, Affine
 
+from log import setup_logger
+
+logger = setup_logger()
+
 logger = logging.getLogger(__name__)
 
 
