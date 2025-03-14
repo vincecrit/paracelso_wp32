@@ -3,6 +3,8 @@ __pycache__
 *.log
 *.ps1
 *.bat
+scripts_notebook
+.obsidian
 logs
 cds
 wp32
