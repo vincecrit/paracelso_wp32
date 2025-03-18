@@ -1,0 +1,8 @@
+{
+    "attachment": 10,
+    "tightness": 0.3,
+    "num_warp": 3,
+    "num_iter": 10,
+    "tol": 0.0001,
+    "prefilter": false
+}
