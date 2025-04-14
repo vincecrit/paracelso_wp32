@@ -32,7 +32,7 @@ def get_parser() -> argparse.ArgumentParser:  # cosa faccio con questo mostro?
     parser.add_argument("-t", "--target", help=TARGET, type=str)
     parser.add_argument("-o", "--output", help=OUTPUT,
                         default="output.tif", type=str)
-    parser.add_argument("-b", "--band", help=BAND, default=None, type=str)
+    parser.add_argument("-b", "--band", help=BAND, default=None, type=int)
     parser.add_argument("--nodata", help=NODATA, default=None, type=float)
     parser.add_argument("-prep", "--preprocessing",
                         default='equalize', type=str)
@@ -102,7 +102,7 @@ def load_file(source, **kwargs):
     return Image(*rasterio_read(source, **kwargs))
 
 
-def load_images(*args):
+def load_images(*args, band):
     """
     Carica una coppia di immagini e resituisce una coppia di oggetti 
     `ot.interfaces.Image`.
@@ -133,8 +133,8 @@ def load_images(*args):
 
     else:
         # carico qualsiasi tipo di file con rasterio (tanto legge tutto mwaahahah)
-        reference = load_file(reference_file)
-        target = load_file(target_file)
+        reference = load_file(reference_file, band)
+        target = load_file(target_file, band)
 
         # [2] rasterio associa un oggetto Affine come matrice identità quando la
         # georeferenziazione non è definita
@@ -191,7 +191,7 @@ def main() -> None:
 
     algorithm.toJSON()
 
-    reference, target = load_images(args.reference, args.target)
+    reference, target = load_images(args.reference, args.target, band=args.band)
     preprocessed_images = [
         dispatcher.dispatch_process(
             f"{algorithm.library}_{args.preprocessing}", array=img)
