@@ -1,6 +1,0 @@
-attachment: 10
-tightness: 0.2
-num_warp: 5
-num_iter: 10
-tol: 0.0001
-prefilter: false

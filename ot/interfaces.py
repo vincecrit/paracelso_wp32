@@ -78,6 +78,9 @@ class Image:
         :param crs: The coordinate reference system.
         :param nodata: The nodata value.
         """
+        if image.ndim < 2:
+            raise ValueError("Image array must have at least 2 dimensions.")
+
         self.image = image
         splitted = cv2.split(image)
         self.bandnames = self.__get_bandnames(len(splitted))
@@ -239,7 +242,6 @@ class OTAlgorithm(ABC):
     def toJSON(self, file: str | Path = None) -> None:
         """Convert the instance to a JSON string and save to a file."""
         parms = self.__dict__
-        print(self.__dict__)
 
         if file is None:
             file = f"{self.__class__.__name__}_parms.json"

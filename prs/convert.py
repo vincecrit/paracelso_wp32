@@ -38,6 +38,10 @@ def get_prisma_info(prisma_file: str | Path):
 def prisma_panchromatic_to_gtiff(prisma_file: str | Path, band='swir'):
     prisma_file = Path(prisma_file)
 
+    valid_bands = ['pan', 'swir', 'vnir']
+    if band not in valid_bands:
+        raise ValueError(f"Invalid band '{band}'. Valid options are {valid_bands}.")
+
     with h5py.File(prisma_file) as src:
         epsg = src.attrs["Epsg_Code"]
 

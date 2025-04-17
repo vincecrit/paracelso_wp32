@@ -3,7 +3,7 @@ import os
 from logging.handlers import TimedRotatingFileHandler
 
 LOG_FORMAT = "%(asctime)s [%(name)s.%(funcName)s - %(lineno)s][%(levelname)s] - %(message)s"
-LOG_LEVEL = logging.DEBUG  # Puoi cambiarlo a INFO, WARNING, ERROR, CRITICAL
+LOG_LEVEL = logging.INFO  # Replace 200 with a valid logging level
 
 
 def setup_logger(name: str):
