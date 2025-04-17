@@ -68,6 +68,10 @@ def batch_to_image(h5_files: list, wd: str | Path = Path.cwd(),
     Esporta una lista di file CSK (formato H5) nel formato
     indicato dall'argomento `format` (default = `jpeg`)
     '''
+    for csk_file in h5_files:
+        if not Path(csk_file).is_file():
+            raise FileNotFoundError(f"File not found: {csk_file}")
+
     wd = Path(wd)
     if not wd.is_dir():
         wd.mkdir(parents=True)

@@ -16,7 +16,9 @@ from ot.interfaces import Image
 from ot.metodi import get_method
 from ot.utils import (DriverCapabilityError, RasterioIOError,
                       _is_identity_affine, basic_pixel_coregistration,
-                      geopandas_to_gpkg, image_to_raster, rasterio_read)
+                      geopandas_to_gpkg, image_to_raster, load_images,
+                      rasterio_read, write_output)
+
 
 logger = setup_logger(__name__)
 
@@ -67,131 +69,18 @@ def get_parser() -> argparse.ArgumentParser:  # cosa faccio con questo mostro?
     return parser
 
 
-def write_output(output, outfile: str | Path) -> None:
-
-    outfile = Path(outfile)
-
-    match outfile.suffix:
-        case ".tiff":
-            image_to_raster(output, outfile)
-        case ".tif":
-            image_to_raster(output, outfile)
-        case ".jpg":
-            raise NotImplementedError
-        case ".jpeg":
-            raise NotImplementedError
-        case ".png":
-            raise NotImplementedError
-        case ".gpkg":
-            geopandas_to_gpkg(output, outfile)
-        case ".shp":
-            geopandas_to_gpkg(output, outfile)
-        case _:
-            raise NotImplementedError
-
-
-def load_file(source, **kwargs):
-    # forse si può fare a meno di averla, è diventata un
-    #  wrap-up di `ot.utils.rasterio_open`
-    source = Path(source)
-
-    if not source.is_file():
-        logger.critical(f"Il file {source} non esiste")
-        exit(0)
-
-    return Image(*rasterio_read(source, **kwargs))
-
-
-def load_images(*args, band):
-    """
-    Carica una coppia di immagini e resituisce una coppia di oggetti 
-    `ot.interfaces.Image`.
-
-    Info:
-        Operazioni eseguite:
-        1. Controllo estensione dei file
-        2. Controllo georeferenziazione
-        3. Coregistrazione di immagini
-        4. Output (oggetti `ot.interfaces.Image`)
-
-    Args:
-        *args(str): percorsi delle immagini di reference e target, in quest'ordine
-
-    Returns:
-        tuple(ot.interfaces.Image):
-    """
-    #  [1] Creo oggetti Path
-    reference_file, target_file = [Path(src) for src in args]
-    logger.info(f"REFERENCE: {reference_file.name}")
-    logger.info(f"TARGET: {target_file.name}")
-
-    # file con estensione diversa non sono accettati
-    if not reference_file.suffix == target_file.suffix:
-        logger.critical("Le due immagini hanno formati diversi")
-        logger.debug(f"{reference_file.suffix=}, {target_file.suffix=}")
-        exit(0)
-
-    else:
-        # carico qualsiasi tipo di file con rasterio (tanto legge tutto mwaahahah)
-        reference = load_file(reference_file, band)
-        target = load_file(target_file, band)
-
-        # [2] rasterio associa un oggetto Affine come matrice identità quando la
-        # georeferenziazione non è definita
-        are_identity_affines = [
-            _is_identity_affine(e.affine) for e in (reference, target)
-        ]
-
-        # Se nessuno dei file è georiferito non dovrebbero esserci problemi (credo)
-        if all(are_identity_affines):
-            logger.warning("Nessuno dei due file possiede una georeferenziazione. " +
-                           "La coregistrazione si limiterà ad allinerare/scalare i pixel " +
-                           "dell'immagine target")
-            pass
-
-        # Se la georeferenziazione è definita solo per uno dei due file, non
-        # so che fare... Quindi lo butto fuori.
-        elif any(are_identity_affines):
-            logger.critical(
-                "Uno dei due file non possiede la georeferenziazione.")
-            logger.debug(f"{_is_identity_affine(reference.affine)=}")
-            logger.debug(f"{_is_identity_affine(target.affine)=}")
-            exit(0)
-
-        # [3] Coregistrazione delle immagini
-        else:
-            if not reference.is_coregistered(target):
-                logger.info("Eseguo coregistrazione tra immagini raster")
-                target_coreg = basic_pixel_coregistration(str(target_file),
-                                                          str(reference_file))
-                logger.info(f"Coregistrazione eseguita correttamente" +
-                            f"File coregistrato: {target_coreg}")
-                target = load_file(target_coreg)
-            else:
-                # non succede mai in realtà
-                logger.info("Immagini raster già coregistrate.")
-
-        return reference, target
-
-
-def _summary_statistics(array):  # For fun
-    logger.debug(f"{'OT Media':>22s}: {np.mean(array): .3g}")
-    logger.debug(f"{'OT Mediana':>22s}: {np.median(array): .3g}")
-    logger.debug(f"{'OT STD':>22s}: {np.std(array): .3g}")
-    logger.debug(f"{'OT Minimo':>22s}: {np.min(array): .3g}")
-    logger.debug(f"{'OT Massimo':>22s}: {np.max(array): .3g}")
-    logger.debug(f"{'OT 25° perc.':>22s}: {np.percentile(array, 25): .3g}")
-    logger.debug(f"{'OT 75° perc.':>22s}: {np.percentile(array, 75): .3g}")
-
-
 def main() -> None:
     args = get_parser().parse_args()
+    if not args.algname or not args.reference or not args.target:
+        logger.critical("Missing required arguments: --algname, --reference, --target")
+        exit(1)
     algorithm = get_method(args.algname).from_dict(vars(args))
     logger.info(f"AVVIO ANALISI OT CON METODO {algorithm.__class__.__name__}")
 
     algorithm.toJSON()
 
-    reference, target = load_images(args.reference, args.target, band=args.band)
+    reference, target = load_images(
+        args.reference, args.target, band=args.band)
     preprocessed_images = [
         dispatcher.dispatch_process(
             f"{algorithm.library}_{args.preprocessing}", array=img)
@@ -201,8 +90,6 @@ def main() -> None:
     displacements = algorithm(*preprocessed_images)
     logger.info(
         f"Algoritmo {algorithm.__class__.__name__} eseguito correttamente")
-
-    _summary_statistics(displacements)
 
     try:
         logger.info(f"Esporto su file: {args.output}")

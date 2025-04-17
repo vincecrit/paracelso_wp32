@@ -82,6 +82,8 @@ def _is_multiband(array) -> bool: return array.ndim > 2
 
 
 def _normalize(array, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8U):
+    if not isinstance(array, np.ndarray):
+        raise TypeError("Input must be a NumPy array.")
     logger.debug(
         f"Normalizzo immagine nell'intervallo: ({alpha}, {beta})." +
         f" Normalizzazione: {_get_cv2_norm_name(cv2.NORM_MINMAX)}." +

@@ -31,6 +31,8 @@ class CSKFilename:
 
     @classmethod
     def parse_filename(cls, filename: str):
+        if len(filename) < 20:  # Example validation
+            raise ValueError("Invalid filename format.")
 
         NAME = utils.StrChopper(filename)
         mission = NAME.chop(3)
@@ -149,6 +151,8 @@ class CSGFilename:
 
     @classmethod
     def parse_filename(cls, filename: str):
+        if len(filename) < 20:  # Example validation
+            raise ValueError("Invalid filename format.")
 
         NAME = utils.StrChopper(filename)
         mission = NAME.chop(3)

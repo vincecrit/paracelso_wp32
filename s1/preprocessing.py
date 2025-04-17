@@ -2,21 +2,40 @@ import subprocess as sp
 import sys
 from pathlib import Path
 
-from snap_gpt.lib import AOI, GPTSubsetter, Graphs, SARPreprocessing
+from log import setup_logger
 from s1.manifest_file import read_orbit_properties
 from snap_gpt.config import OUTFOLDER
+from snap_gpt.lib import AOI, GPTSubsetter, Graphs, SARPreprocessing
+
+logger = setup_logger(__name__)
 
 
 class S1Preprocessor:
     def __init__(self, AOI_SUBSET: str | AOI, PROCESS: SARPreprocessing) -> None:
-        
+        if not isinstance(PROCESS, SARPreprocessing):
+            raise TypeError(
+                f"PROCESS must be SARPreprocessing enum, got {type(PROCESS)}")
+
         self._PROCESS = PROCESS.value
-        self.SUBSET = GPTSubsetter().get_aoi(AOI_SUBSET)
-        self.GRAPH = Graphs._member_map_[PROCESS.value].value
+        try:
+            self.SUBSET = GPTSubsetter().get_aoi(AOI_SUBSET)
+        except (FileNotFoundError, ValueError) as e:
+            logger.error(f"Failed to get AOI: {e}")
+            raise
+
+        graph_path = Graphs._member_map_[PROCESS.value].value
+        if not graph_path.is_file():
+            raise FileNotFoundError(f"Graph file not found: {graph_path}")
+        self.GRAPH = graph_path
 
     def run(self, SARFILE: str | Path) -> None:
+        SARFILE = Path(SARFILE)
+        if not SARFILE.is_file():
+            raise FileNotFoundError(f"SAR file not found: {SARFILE}")
 
-        SARFILE = Path(SARFILE)  # non si sa mai
+        if not SARFILE.suffix == '.zip':
+            raise ValueError("SAR file must be a zip archive")
+
         orbit_properties = read_orbit_properties(SARFILE)
 
         ORBIT_TAG = orbit_properties.ORBIT_PASS[0]
@@ -29,7 +48,7 @@ class S1Preprocessor:
 
         if not OUTFOLDER.is_dir():
             OUTFOLDER.mkdir(parents=True)
-        
+
         sp.run(["gpt.exe",
                 self.GRAPH,
                 f'-Pf='+str(SARFILE),

@@ -116,15 +116,15 @@ def xcorr_to_frame(ref: Image, tar: Image,
 
     offset_record = list()
     for (r, t) in tqdm(iterable=zip(_ref, _tar), desc=f"IMGCORR", total=index.shape[0], ncols=150):
-        (sr, sc), _, _ = phase_cross_correlation(r, t,
+        (sr, sc), error, _ = phase_cross_correlation(r, t,
                                                  normalization=normalization,
                                                  upsample_factor=upsample_factor)
 
         L2 = np.sqrt(sr**2 + sc**2)  # risultante dello spostamento
-        row = L2, float(sr), float(sc)
+        row = L2, float(sr), float(sc), float(error)
         offset_record.append(row)
 
-    columns = ["L2", "RSHIFT", "CSHIFT"]
+    columns = ["L2", "RSHIFT", "CSHIFT", "NRMS"]
     df = pd.DataFrame(offset_record, columns=columns)
 
     if ref.affine is not None:  # caso del raster di input
@@ -195,6 +195,9 @@ class OpenCVOpticalFlow(OTAlgorithm):
         """
         Calculate optical flow between reference and target images.
         """
+        if reference.shape != target.shape:
+            raise ValueError("Reference and target images must have the same dimensions.")
+
         logger.info("Eseguo algoritmo cv2.calcOpticalFlowFarneback")
         logger.debug(f"{reference.shape = }, {reference.image.dtype = }")
         logger.debug(f"{target.shape = }, {target.image.dtype = }")

@@ -43,16 +43,23 @@ class GPTSubsetter:
     """
 
     def __init__(self, gpkg: str | Path | None = None):
-        self._gpkg = gpkg or AOI_GPKG
+        self._gpkg = None
+        if gpkg:
+            self.gpkg = gpkg  # Usa il setter per validazione
+        else:
+            self._gpkg = AOI_GPKG
+            if not Path(self._gpkg).is_file():
+                raise FileNotFoundError(f"Default GPKG file not found: {self._gpkg}")
 
     @property
     def gpkg(self): return self._gpkg
 
     @gpkg.setter
     def gpkg(self, value: str | Path) -> None:
-        assert Path(value).is_file()
-
-        self._gpkg = Path(value)
+        path = Path(value)
+        if not path.is_file():
+            raise FileNotFoundError(f"GPKG file not found: {path}")
+        self._gpkg = path
 
     def get_aoi(self, case_study: AOI | str) -> Subset:
 
@@ -83,6 +90,8 @@ class GPTSubsetter:
                 # "/percorso/a/file.gpkg|layername" oppure "/percorso/a/shapefile.shp"
                 if "|" in case_study:  
                     file, layername = case_study.split("|")
+                    if not layername:
+                        raise ValueError("Layer name cannot be empty")
 
                 else:
                     file, layername = case_study, None

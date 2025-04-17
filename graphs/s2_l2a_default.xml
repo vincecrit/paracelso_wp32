@@ -1,0 +1,52 @@
+<graph id="S2_L2A_Resample_Export"> 
+  <version>1.0</version> 
+  <node id="Read"> 
+    <operator>Read</operator> 
+    <parameters> 
+      <file>${f}</file> 
+    </parameters> 
+  </node> 
+  <node id="Resample"> 
+    <operator>Resample</operator> 
+    <sources> 
+      <sourceProduct>Read</sourceProduct> 
+    </sources> 
+    <parameters> 
+      <targetResolution>10</targetResolution> 
+      <upsampling>Nearest</upsampling> 
+      <downsampling>First</downsampling> 
+      <flagDownsampling>First</flagDownsampling>
+      <resampleOnPyramidLevels>false</resampleOnPyramidLevels> 
+    </parameters> 
+  </node> 
+  <node id="BandSelect"> 
+    <operator>BandSelect</operator> 
+    <sources> 
+      <sourceProduct>Resample</sourceProduct> 
+    </sources> 
+    <parameters> 
+      <sourceBands>B2,B3,B4,B8</sourceBands> 
+    </parameters> 
+  </node> 
+  <node id="Subset">
+    <operator>Subset</operator>
+    <sources>
+      <sourceProduct refid="BandSelect"/>
+    </sources>
+    <parameters class="com.bc.ceres.binding.dom.XppDomElement">
+      <geoRegion>${subset}</geoRegion>
+    </parameters>
+  </node>
+  <node id="Write"> 
+    <operator>Write</operator> 
+    <sources> 
+      <sourceProduct>Subset</sourceProduct> 
+    </sources> 
+    <parameters> 
+      <file>${o}</file> 
+      <formatName>GeoTIFF</formatName> 
+    </parameters> 
+  </node> 
+</graph> 
+
+ 
