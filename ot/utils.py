@@ -225,6 +225,20 @@ def rasterio_read(source: str, band: int | None = None) -> tuple:
             else:
                 iter_bands = [band]
 
+    with rasterio.open(source) as src:
+
+        if band is None:
+            iter_bands = range(min(3, src.count))
+
+        elif band > (src.count - 1):
+            logging.critical(f"La banda selezionata non esiste. " +
+                             f"Numero bande dataset: {src.count}. " +
+                             "Gli indici delle bande partono da zero")
+            exit(0)
+
+        else:
+            iter_bands = [band]
+
             channels = []
             for b in iter_bands:
                 band = src.read(b+1)
