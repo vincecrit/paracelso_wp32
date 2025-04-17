@@ -227,8 +227,8 @@ def rasterio_read(source: str, band: int | None = None) -> tuple:
 
             channels = []
             for b in iter_bands:
-                band = src.read(b+1)
-                channels.append(band)
+                band_data = src.read(b + 1)
+                channels.append(band_data)
 
             dataset = cv2.merge(channels)
             affine = src.meta['transform']
