@@ -6,6 +6,7 @@ __pycache__
 logs
 cds
 wp32
+tests
 output
 test.py
 note.md
