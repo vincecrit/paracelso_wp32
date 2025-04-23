@@ -1,12 +1,16 @@
 from ot.helpmsg import ATTACHMENT, NUMITER, NUMWARP, PREFILTER, TIGHTNESS, TOL
 
-from .interfaces import BaseCLI
+from .algoritmi import SkiOpticalFlowTVL1
+from .cli import BaseCLI
 
 
 class SKIOFTVL1_CLI(BaseCLI):
     def __init__(self):
         super().__init__()
         self.add_specific_args()
+
+    def get_algorithm(self, **kwargs):
+        return SkiOpticalFlowTVL1.from_dict(kwargs)
 
     def add_specific_args(self):
         self.parser.add_argument(

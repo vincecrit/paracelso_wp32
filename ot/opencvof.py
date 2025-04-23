@@ -1,13 +1,17 @@
 from ot.helpmsg import (FLAGS, FLOW, ITERATIONS, LEVELS, POLY_N, POLY_SIGMA,
                         PYR_SCALE, WINSIZE)
 
-from .interfaces import BaseCLI
+from .algoritmi import OpenCVOpticalFlow
+from .cli import BaseCLI
 
 
 class OPENCVOF_CLI(BaseCLI):
     def __init__(self):
         super().__init__()
         self.add_specific_args()
+
+    def get_algorithm(self, **kwargs):
+        return OpenCVOpticalFlow.from_dict(kwargs)
 
     def add_specific_args(self):
         self.parser.add_argument(

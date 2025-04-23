@@ -26,7 +26,6 @@ Functions:
     - OTAlgorithm._to_displacements: Convert pixel offsets to displacements.
     - OTAlgorithm.__call__: Call the algorithm.
 """
-import argparse
 import json
 from abc import ABC
 from inspect import signature
@@ -37,10 +36,7 @@ import numpy as np
 from rasterio import CRS, Affine
 
 from log import setup_logger
-from ot.helpmsg import BAND, NODATA, OUTPUT, REFERENCE, TARGET
 
-from . import lib
-from .image_processing import dispatcher
 
 logger = setup_logger(__name__)
 
@@ -248,51 +244,3 @@ class OTAlgorithm(ABC):
         return np.linalg.norm([dxx, dyy], axis=0)
 
     def __call__(self, *args, **kwargs) -> None: ...
-
-
-class BaseCLI:
-    def __init__(self):
-        self.parser = argparse.ArgumentParser(
-            description="Offset-Tracking PARACELSO WP3.2")
-        self.add_common_args()
-
-    def add_common_args(self):
-        self.parser.add_argument(
-            "-r", "--reference", required=True, help=REFERENCE, type=str)
-        self.parser.add_argument(
-            "-t", "--target", required=True, help=TARGET, type=str)
-        self.parser.add_argument(
-            "-o", "--output", help=OUTPUT, default="output.tif", type=str)
-        self.parser.add_argument(
-            "-b", "--band", help=BAND, default=None, type=int)
-        self.parser.add_argument(
-            "--nodata", help=NODATA, default=None, type=float)
-        self.parser.add_argument(
-            "-prep", "--preprocessing", default='equalize', type=str)
-        # self.parser.add_argument(
-        #     "-ot", "--algname", required=True, help=ALGNAME, type=str)
-        # self.parser.add_argument(
-        #     "--out_format", default=None, type=str)
-
-    def get_parser(self): return self.parser
-
-    def run(self, algorithm: OTAlgorithm):
-
-        parser = self.get_parser()
-        args = parser.parse_args()
-
-        reference, target = lib.load_images(
-            args.reference, args.target, band=args.band)
-
-        preprocessed_images = [
-            dispatcher.dispatcher.dispatch_process(
-                f"{algorithm.library}_{args.preprocessing}", array=img)
-            for img in (reference, target)]
-
-        logger.info(f"{args.preprocessing.upper()} eseguito correttamente.")
-        displacements = algorithm(*preprocessed_images)
-        logger.info(
-            f"Algoritmo {algorithm.__class__.__name__} eseguito correttamente")
-
-        logger.info(f"Esporto su file: {args.output}")
-        lib.write_output(displacements, args.output)

@@ -1,12 +1,15 @@
-from ot.helpmsg import GAUSSIAN, NUMWARP, PREFILTER, RADIUS
-
-from .interfaces import BaseCLI
+from .algoritmi import SkiOpticalFlowILK
+from .cli import BaseCLI
+from .helpmsg import GAUSSIAN, NUMWARP, PREFILTER, RADIUS
 
 
 class SKIOFILK_CLI(BaseCLI):
     def __init__(self):
         super().__init__()
         self.add_specific_args()
+
+    def get_algorithm(self, **kwargs):
+        return SkiOpticalFlowILK.from_dict(kwargs)
 
     def add_specific_args(self):
         self.parser.add_argument(
