@@ -45,7 +45,7 @@ class BaseCLI:
         algorithm = self.get_algorithm(**vars(args))
 
         reference, target = lib.load_images(
-            args.reference, args.target, band=args.band)
+            args.reference, args.target, band=args.band, nodata=args.nodata)
 
         preprocessed_images = [
             dispatcher.dispatcher.dispatch_process(

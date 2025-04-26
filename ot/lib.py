@@ -84,7 +84,7 @@ def image_to_rasterio(img: Image, outfile) -> None:
 
     driver = rasterio.drivers.driver_from_extension(outfile)
     try:
-        with rasterio.open(outfile, "w", transform=img.affine, driver=driver, crs=img.crs, nodata=0,
+        with rasterio.open(outfile, "w", transform=img.affine, driver=driver, crs=img.crs, nodata=img.nodata,
                            width=img.width, height=img.height, dtype=img.image.dtype, count=1) as ds:
             ds.write(img.image, 1)
     except (DriverCapabilityError, DriverRegistrationError, PathError, RasterioIOError) as err:
@@ -125,7 +125,7 @@ def write_output(output, outfile: str | Path) -> None:
                 f"Unsupported file extension: {outfile.suffix}")
 
 
-def load_images(*args, **kwargs):
+def load_images(*args, nodata=None, **kwargs):
     """
     Carica una coppia di immagini e resituisce una coppia di oggetti 
     `ot.interfaces.Image`.
@@ -156,8 +156,8 @@ def load_images(*args, **kwargs):
 
     else:
         # carico qualsiasi tipo di file con rasterio (tanto legge tutto mwaahahah)
-        reference = Image(*rasterio_open(reference_file, **kwargs))
-        target = Image(*rasterio_open(target_file, **kwargs))
+        reference = Image(*rasterio_open(reference_file, **kwargs), nodata=nodata)
+        target = Image(*rasterio_open(target_file, **kwargs), nodata=nodata)
 
         # [2] rasterio associa un oggetto Affine come matrice identità quando la
         # georeferenziazione non è definita
