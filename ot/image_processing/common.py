@@ -114,3 +114,15 @@ def to_single_band_uint8(array, **kwargs) -> np.ndarray:
         array = _normalize(color.rgb2gray(array))
 
     return array
+
+
+def svd_filter(patch: np.ndarray, k: int = 5, full_matrices=False):
+    U, stride, VT = np.linalg.svd(patch, full_matrices=full_matrices)
+
+    # Mantieni solo i primi k valori singolari
+    S_filtered = np.zeros_like(stride)
+    S_filtered[:k] = stride[:k]
+    S_matrix = np.diag(S_filtered)
+
+    # Ricostruzione della patch
+    return np.dot(U, np.dot(S_matrix, VT))

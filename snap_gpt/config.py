@@ -21,5 +21,5 @@ def get_config_file(yml: str | Path) -> dict:
 config_file = get_config_file(Path(__file__).parent/'sarprep_config.yaml')
 
 OUTFOLDER = config_file['OUTFOLDER']
-AOI_GPKG = config_file['AOI_GPKG']
+# AOI_GPKG = config_file['AOI_GPKG']
 GRAPHS_WD = config_file['GRAPHS_WD']

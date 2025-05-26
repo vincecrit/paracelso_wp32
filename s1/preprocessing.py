@@ -18,7 +18,7 @@ class S1Preprocessor:
 
         self._PROCESS = PROCESS.value
         try:
-            self.SUBSET = GPTSubsetter().get_aoi(AOI_SUBSET)
+            self.SUBSET = GPTSubsetter.get_subset(AOI_SUBSET)
         except (FileNotFoundError, ValueError) as e:
             logger.error(f"Failed to get AOI: {e}")
             raise

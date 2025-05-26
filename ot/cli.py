@@ -29,10 +29,6 @@ class BaseCLI:
             "--nodata", help=NODATA, default=None, type=float)
         self.parser.add_argument(
             "-prep", "--preprocessing", default='equalize', type=str)
-        # self.parser.add_argument(
-        #     "-ot", "--algname", required=True, help=ALGNAME, type=str)
-        # self.parser.add_argument(
-        #     "--out_format", default=None, type=str)
 
     def get_parser(self): return self.parser
 
