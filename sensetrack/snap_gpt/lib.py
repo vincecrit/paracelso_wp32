@@ -1,11 +1,9 @@
 from collections import namedtuple
 from enum import Enum, unique
-from pathlib import Path
 
 import geopandas as gpd
-import shapely
 
-from snap_gpt.config import GRAPHS_WD
+from sensetrack import GRAPHS_WD
 
 
 @unique
@@ -26,15 +24,6 @@ class Graphs(Enum):
     S1SLC_NOSFB3 = GRAPHS_WD / "s1_slc_noSpeckleFilter+band3.xml"
 
 
-@unique
-class AOI(Enum):
-    CALITA = "CL"
-    SASSINERI = "SN"
-    VALORIA = "VL"
-    BALDIOLA = "BL"
-    BOCCASSUOLO = "BS"
-
-
 Subset = namedtuple("Subset", ["name", "geometry"])
 
 
@@ -44,16 +33,16 @@ class GPTSubsetter:
     """
 
     @classmethod
-    def get_subset(self, case_study: str) -> Subset:
+    def get_subset(self, aoi: str) -> Subset:
         # Caso di shapefile (o gpkg) qualunque
         # "/percorso/a/file.gpkg|layername" oppure "/percorso/a/shapefile.shp"
-        if "|" in case_study:
-            file, layername = case_study.split("|")
+        if "|" in aoi:
+            file, layername = aoi.split("|")
             if not layername:
                 raise ValueError("Layer name cannot be empty")
 
         else:
-            file, layername = case_study, None
+            file, layername = aoi, None
 
         geometry = gpd.read_file(file, layer=layername).to_crs(
             "EPSG:4326").geometry[0]

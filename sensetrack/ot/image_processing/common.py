@@ -10,7 +10,7 @@ import numpy as np
 from skimage import color
 
 from log import setup_logger
-from ot.interfaces import Image
+from sensetrack.ot.interfaces import Image
 
 logger = setup_logger(__name__)
 

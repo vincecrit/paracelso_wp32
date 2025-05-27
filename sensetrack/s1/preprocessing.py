@@ -2,36 +2,31 @@ import subprocess as sp
 import sys
 from pathlib import Path
 
-from log import setup_logger
-from s1.manifest_file import read_orbit_properties
-from snap_gpt.config import OUTFOLDER
-from snap_gpt.lib import AOI, GPTSubsetter, Graphs, SARPreprocessing
+from sensetrack.log import setup_logger
+from sensetrack.s1.manifest_file import read_orbit_properties
+from sensetrack.snap_gpt.lib import GPTSubsetter, Graphs, SARPreprocessing
 
 logger = setup_logger(__name__)
 
 
 class S1Preprocessor:
-    def __init__(self, AOI_SUBSET: str | AOI, PROCESS: SARPreprocessing) -> None:
+    def __init__(self, SUBSET: GPTSubsetter, PROCESS: SARPreprocessing) -> None:
         if not isinstance(PROCESS, SARPreprocessing):
             raise TypeError(
                 f"PROCESS must be SARPreprocessing enum, got {type(PROCESS)}")
 
         self._PROCESS = PROCESS.value
-        try:
-            self.SUBSET = GPTSubsetter.get_subset(AOI_SUBSET)
-        except (FileNotFoundError, ValueError) as e:
-            logger.error(f"Failed to get AOI: {e}")
-            raise
+        self.SUBSET = SUBSET
+        GRAPH_PATH = Graphs._member_map_[PROCESS.value].value
 
-        graph_path = Graphs._member_map_[PROCESS.value].value
-        if not graph_path.is_file():
-            raise FileNotFoundError(f"Graph file not found: {graph_path}")
-        self.GRAPH = graph_path
+        if not GRAPH_PATH.is_file():
+            raise FileNotFoundError(f"Graph file not found: {GRAPH_PATH}")
+
+        self.GRAPH = GRAPH_PATH
 
     def run(self, SARFILE: str | Path) -> None:
+
         SARFILE = Path(SARFILE)
-        if not SARFILE.is_file():
-            raise FileNotFoundError(f"SAR file not found: {SARFILE}")
 
         if not SARFILE.suffix == '.zip':
             raise ValueError("SAR file must be a zip archive")
@@ -46,36 +41,35 @@ class S1Preprocessor:
             f'{orbit_properties.RELORBIT:>03}_' +\
             f'{orbit_properties.NODE_TIME}.tif'
 
-        if not OUTFOLDER.is_dir():
-            OUTFOLDER.mkdir(parents=True)
-
         sp.run(["gpt.exe",
                 self.GRAPH,
                 f'-Pf='+str(SARFILE),
                 '-Psubset='+self.SUBSET.geometry.__str__(),
-                '-Po='+str(OUTFOLDER / OUTPUT_FILE)
+                '-Po='+str(SARFILE.parent / OUTPUT_FILE)
                 ],
                shell=True)
 
 
 if __name__ == "__main__":
+
     import sys
 
-    __sites = list(AOI._member_map_.keys())
     __processes = list(SARPreprocessing._member_map_.keys())
 
-    if sys.argv[1].upper() in __sites:
-        SUBSET = eval(f"AOI.{sys.argv[1].upper()}")
-    else:
-        SUBSET = sys.argv[1]
-
     assert sys.argv[2].upper() in __processes
+
+    try:
+        SUBSET = GPTSubsetter.get_subset(sys.argv[1])
+
+    except (FileNotFoundError, ValueError) as err:
+        logger.error(f"Failed to get AOI: {err}")
+        exit(-1)
 
     PROCESS = eval(f"SARPreprocessing.{sys.argv[2].upper()}")
     SARFILE = Path(sys.argv[3])
 
     if not SARFILE.is_file():
-        print(f"Il file {SARFILE} non esiste.")
+        print(f"The file {SARFILE} does not exist.")
         exit(-1)
 
     else:

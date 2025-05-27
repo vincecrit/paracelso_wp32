@@ -1,6 +1,4 @@
 import logging
-import os
-from logging.handlers import TimedRotatingFileHandler
 
 LOG_FORMAT = "%(asctime)s [%(name)s.%(funcName)s - %(lineno)s][%(levelname)s] - %(message)s"
 LOG_LEVEL = logging.INFO

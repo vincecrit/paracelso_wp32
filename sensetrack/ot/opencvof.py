@@ -1,8 +1,8 @@
 from ot.helpmsg import (FLAGS, FLOW, ITERATIONS, LEVELS, POLY_N, POLY_SIGMA,
                         PYR_SCALE, WINSIZE)
 
-from .algoritmi import OpenCVOpticalFlow
-from .cli import BaseCLI
+from sensetrack.ot.algoritmi import OpenCVOpticalFlow
+from sensetrack.ot.cli import BaseCLI
 
 
 class OPENCVOF_CLI(BaseCLI):
