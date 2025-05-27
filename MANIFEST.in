@@ -1,0 +1,4 @@
+recursive-include sensetrack *.xml
+recursive-include sensetrack *.yaml
+include README.md
+include LICENCE

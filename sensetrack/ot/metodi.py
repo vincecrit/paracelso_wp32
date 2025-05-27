@@ -9,7 +9,7 @@ Functions:
 """
 from enum import Enum, unique
 
-from ot import algoritmi, interfaces
+from sensetrack.ot import algoritmi, interfaces
 
 @unique
 class AlgFactory(Enum):

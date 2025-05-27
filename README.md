@@ -1,12 +1,12 @@
-# Offset-tracking user manual
+# SenseTrack user manual
 
 ## Introduction
 
-This manual provides instructions on how to use the various modules and functions available in the `paracelso_wp32` package. The package includes utilities for image normalization, optical flow algorithms, image coregistration, and SAR preprocessing.
+This manual provides instructions on how to use the various modules and functions available in the `sensetrack` package. The package includes utilities for image normalization, optical flow algorithms, image coregistration, and SAR preprocessing.
 
 ## Table of Contents
 
-- [Offset-tracking user manual](#offset-tracking-user-manual)
+- [SenseTrack user manual](#sensetrack-user-manual)
   - [Introduction](#introduction)
   - [Table of Contents](#table-of-contents)
   - [Installation](#installation)

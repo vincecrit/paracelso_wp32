@@ -1,6 +1,6 @@
-from .algoritmi import SkiOpticalFlowILK
-from .cli import BaseCLI
-from .helpmsg import GAUSSIAN, NUMWARP, PREFILTER, RADIUS
+from sensetrack.ot.algoritmi import SkiOpticalFlowILK
+from sensetrack.ot.cli import BaseCLI
+from sensetrack.ot.helpmsg import GAUSSIAN, NUMWARP, PREFILTER, RADIUS
 
 
 class SKIOFILK_CLI(BaseCLI):

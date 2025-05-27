@@ -24,7 +24,7 @@ from skimage.util import view_as_windows
 from tqdm import tqdm
 
 from log import setup_logger
-from ot.interfaces import Image, OTAlgorithm
+from sensetrack.ot.interfaces import Image, OTAlgorithm
 
 logger = setup_logger(__name__)
 

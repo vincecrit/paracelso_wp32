@@ -1,5 +1,5 @@
 from log import setup_logger
-from ot.image_processing import opencv, ski
+from sensetrack.ot.image_processing import opencv, ski
 
 logger = setup_logger(__name__)
 

@@ -1,7 +1,7 @@
-from ot.helpmsg import PHASENORM, STEPSIZE, UPSAMPLE_FACTOR, WINSIZE
+from sensetrack.ot.helpmsg import PHASENORM, STEPSIZE, UPSAMPLE_FACTOR, WINSIZE
 
-from .algoritmi import SkiPCC_Vector
-from .cli import BaseCLI
+from sensetrack.ot.algoritmi import SkiPCC_Vector
+from sensetrack.ot.cli import BaseCLI
 
 
 class SKIPCCV_CLI(BaseCLI):

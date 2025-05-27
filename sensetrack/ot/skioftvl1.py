@@ -1,7 +1,7 @@
-from ot.helpmsg import ATTACHMENT, NUMITER, NUMWARP, PREFILTER, TIGHTNESS, TOL
+from sensetrack.ot.helpmsg import ATTACHMENT, NUMITER, NUMWARP, PREFILTER, TIGHTNESS, TOL
 
-from .algoritmi import SkiOpticalFlowTVL1
-from .cli import BaseCLI
+from sensetrack.ot.algoritmi import SkiOpticalFlowTVL1
+from sensetrack.ot.cli import BaseCLI
 
 
 class SKIOFTVL1_CLI(BaseCLI):

@@ -2,7 +2,7 @@ import numpy as np
 from skimage import color, exposure
 
 from log import setup_logger
-from ot.image_processing import common
+from sensetrack.ot.image_processing import common
 
 logger = setup_logger(__name__)
 
