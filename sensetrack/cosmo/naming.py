@@ -1,4 +1,4 @@
-import cosmo.utils as utils
+import sensetrack.cosmo.utils as utils
 
 
 class CSKFilename:
@@ -37,8 +37,8 @@ class CSKFilename:
         NAME = utils.StrChopper(filename)
         mission = NAME.chop(3)
         
-        if not mission == 'CSG':
-            raise ValueError("Non è un file CSK (II generazione)")
+        if not mission == 'CSK':
+            raise ValueError("Non è un file CSK (I generazione)")
 
         i = NAME.chop(2)
         _ = NAME.chop(1)
@@ -182,6 +182,7 @@ class CSGFilename:
         start = utils.str2dt(NAME.chop(14))
         _ = NAME.chop(1)
         end = utils.str2dt(NAME.chop(14))
+        _ = NAME.chop(1)
         j = NAME.chop(1)
         _ = NAME.chop(1)
         S = NAME.chop(1)

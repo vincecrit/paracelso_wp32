@@ -2,14 +2,15 @@ import subprocess as sp
 import sys
 from pathlib import Path
 
+from sensetrack.cosmo import lib
 from sensetrack.log import setup_logger
-from sensetrack.s1.manifest_file import read_orbit_properties
 from sensetrack.snap_gpt.lib import GPTSubsetter, Graphs, SARPreprocessing
+
 
 logger = setup_logger(__name__)
 
 
-class S1Preprocessor:
+class CSKPreprocessor:
     def __init__(self, SUBSET: GPTSubsetter, PROCESS: SARPreprocessing) -> None:
         if not isinstance(PROCESS, SARPreprocessing):
             raise TypeError(
@@ -24,28 +25,25 @@ class S1Preprocessor:
 
         self.GRAPH = GRAPH_PATH
 
-    def run(self, SARFILE: str | Path) -> None:
+    def run(self, CSKFILE: str | Path) -> None:
 
-        SARFILE = Path(SARFILE)
+        CSKFILE = Path(CSKFILE)
 
-        if not SARFILE.suffix == '.zip':
-            raise ValueError("SAR file must be a zip archive")
+        if not CSKFILE.suffix == '.h5':
+            raise ValueError("Is not a valid cosmo format")
 
-        orbit_properties = read_orbit_properties(SARFILE)
+        csk_info = lib.CSKProduct.parse_filename(CSKFILE.stem)
 
-        ORBIT_TAG = orbit_properties.ORBIT_PASS[0]
-
-        OUTPUT_FILE = f'{ORBIT_TAG}_' +\
-            f'{self.SUBSET.name}_' +\
-            f'{self._PROCESS}_' +\
-            f'{orbit_properties.RELORBIT:>03}_' +\
-            f'{orbit_properties.NODE_TIME}.tif'
+        OUTPUT_FILE = csk_info.OrbitDirection[0] + "_" +\
+            self.SUBSET.name + "_" +\
+            CSKFILE.stem + ".tif"
 
         sp.run(["gpt.exe",
                 self.GRAPH,
-                f'-Pf='+str(SARFILE),
+                f'-Pf='+str(CSKFILE),
                 '-Psubset='+self.SUBSET.geometry.__str__(),
-                '-Po='+str(SARFILE.parent / OUTPUT_FILE)
+                '-Prm=5.0',
+                '-Po='+str(CSKFILE.parent / OUTPUT_FILE)
                 ],
                shell=True)
 
@@ -66,12 +64,12 @@ if __name__ == "__main__":
         exit(-1)
 
     PROCESS = eval(f"SARPreprocessing.{sys.argv[2].upper()}")
-    SARFILE = Path(sys.argv[3])
+    CSKFILE = Path(sys.argv[3])
 
-    if not SARFILE.is_file():
-        print(f"The file {SARFILE} does not exist.")
+    if not CSKFILE.is_file():
+        print(f"The file {CSKFILE} does not exist.")
         exit(-1)
 
     else:
-        S1Preprocessor(SUBSET, PROCESS).run(SARFILE)
+        CSKPreprocessor(SUBSET, PROCESS).run(CSKFILE)
         exit(1)

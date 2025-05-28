@@ -37,7 +37,7 @@
     <parameters>
       <demName>SRTM 1Sec HGT</demName>
       <demResamplingMethod>BILINEAR_INTERPOLATION</demResamplingMethod>
-      <mapProjection>EPSG:4326</mapProjection>
+      <mapProjection>EPSG:32632</mapProjection>
       <nodataValueAtSea>true</nodataValueAtSea>
       <outputComplex>false</outputComplex>
       <applyRadiometricNormalization>false</applyRadiometricNormalization>
