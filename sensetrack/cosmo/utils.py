@@ -4,7 +4,7 @@ from pathlib import Path
 import geopandas as gpd
 import h5py
 
-import cosmo
+from sensetrack import cosmo
 
 
 class StrChopper:

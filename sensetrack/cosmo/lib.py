@@ -1,4 +1,5 @@
 
+from collections import namedtuple
 from enum import Enum, unique
 
 import h5py
@@ -6,7 +7,7 @@ import numpy as np
 import shapely
 from PIL import Image
 
-import cosmo.utils as utils
+import sensetrack.cosmo.utils as utils
 
 
 @unique
@@ -48,12 +49,50 @@ class Product:
 
     _o = dict(A='Ascending', D='Descending')
 
-    def _is_2ndgen(self, value: str) -> bool:
+    @classmethod
+    def _is_2ndgen(cls, value: str) -> bool:
 
-        if value == self._MISSION:
+        if value == cls._MISSION:
             return True
         else:
             return False
+
+
+CSKInfo = namedtuple("CSKInfo", [
+    "SatelliteID",
+    "ProductType",
+    "InstrumentMode",
+    "Swath",
+    "Polarization",
+    "LookSide",
+    "OrbitDirection",
+    "DeliveryMode",
+    "SelectiveAvaialability",
+    "SensingStartTime",
+    "SensingStopTime"
+])
+
+
+CSGInfo = namedtuple("CSGInfo", [
+    'SatelliteID',
+    'ProductType',
+    'NumRangeLooks',
+    'NumAzimuthLooks',
+    'InstrumentMode',
+    'Swath',
+    'Polarization',
+    'LookSide',
+    'OrbitDirection',
+    'OrbitalDataQuality',
+    'SensingStartTime',
+    'SensingStopTime',
+    'FileSequenceID',
+    'ProductCoverage',
+    'LatitudeSceneCenter',
+    'Hemisphere',
+    'EastDirectionLocation',
+    'SquintAngleSceneCenter'
+])
 
 
 class CSKProduct(Product):
@@ -127,7 +166,11 @@ class CSKProduct(Product):
         Sensing start time:      {start}
         Sensing stop time:       {end}
         """
-        return msg
+
+        print(msg)
+
+        return CSKInfo(i, YYY_Z, cls._MM[MM], SS, cls._PP[PP], cls._s[s],
+                       cls._o[o], cls._D[D], cls._G[G], start, end)
 
 
 class CSGProduct(Product):
@@ -229,6 +272,7 @@ class CSGProduct(Product):
         start = utils.str2dt(NAME.chop(14))
         _ = NAME.chop(1)
         end = utils.str2dt(NAME.chop(14))
+        _ = NAME.chop(1)
         j = NAME.chop(1)
         _ = NAME.chop(1)
         S = NAME.chop(1)
@@ -263,7 +307,12 @@ class CSGProduct(Product):
         East-direction location:   {cls._LL(ZLL)}
         Squint angle scene center: {cls._AAA(AAA)}
         """
-        return msg
+
+        print(msg)
+
+        return CSGInfo(i, YYY_Z, RR, RR, cls._MMM[MMM], SSS, cls._PP[PP],
+                       cls._s[s], cls._o[o], cls._Q[Q], start, end, j, cls._S[S],
+                       int(ll), cls._H[H], cls._LL(ZLL), cls._AAA(AAA))
 
 
 class CSKFile(h5py.File):
@@ -284,7 +333,8 @@ class CSKFile(h5py.File):
                          meta_block_size, **kwds)
 
     def __str__(self):
-        return CSKProduct.parse_filename(self.attrs['Product Filename'].decode())
+        return CSKProduct.parse_filename(
+            self.attrs['Product Filename'].decode()).__str__()
 
     def __repr__(self):
         return self.attrs['Product Filename'].decode()

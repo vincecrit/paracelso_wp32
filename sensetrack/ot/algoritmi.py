@@ -66,6 +66,7 @@ def xcorr_to_frame(ref: Image, tar: Image,
                    win_size: tuple[int] | int,
                    step_size: int,
                    normalization: str | None = 'phase',
+                   disambiguate=True,
                    upsample_factor: int | float = 1.0) -> gpd.GeoDataFrame | pd.DataFrame:
     """
     Cross-correlazione di immagini. Di default, normalizza le immagini
@@ -93,14 +94,15 @@ def xcorr_to_frame(ref: Image, tar: Image,
         frame (geopandas.GeoDataFrame | pandas.DataFrame): shapefile o
         dataframe di output (dipende dal tipo di immagine: raster -> shapefile)
         Vengono memorizzati gli attributi di spostamento risultante (L2) e
-        spostamento lungo le righe (RSHIFT) e colonne (CSHIFT). Tutti gli
-        spostamenti sono espressi nell'unità di misura propria delle immagini
-        di partenza.
+        spostamento lungo le righe (RSHIFT) e colonne (CSHIFT) oltre che di scarto
+        quadratico medio normalizzato (NRMS).
+        Tutti gli spostamenti sono espressi nell'unità di misura propria delle
+        immagini di partenza.
     """
-        
+
     logger.info("Eseguo algoritmo skimage.registration.phase_cross_correlation")
-    logger.debug(f"{ref.shape = }, {ref.image.dtype = }")
-    logger.debug(f"{tar.shape = }, {tar.image.dtype = }")
+    logger.debug(f"{ref.shape=}, {ref.image.dtype=}")
+    logger.debug(f"{tar.shape=}, {tar.image.dtype=}")
 
     if ref.crs is None:
         CRS = None
@@ -117,8 +119,9 @@ def xcorr_to_frame(ref: Image, tar: Image,
     offset_record = list()
     for (r, t) in tqdm(iterable=zip(_ref, _tar), desc=f"IMGCORR", total=index.shape[0], ncols=150):
         (sr, sc), error, _ = phase_cross_correlation(r, t,
-                                                 normalization=normalization,
-                                                 upsample_factor=upsample_factor)
+                                                     normalization=normalization,
+                                                     upsample_factor=upsample_factor,
+                                                     disambiguate=disambiguate)
 
         L2 = np.sqrt(sr**2 + sc**2)  # risultante dello spostamento
         row = L2, float(sr), float(sc), float(error)
@@ -191,16 +194,18 @@ class OpenCVOpticalFlow(OTAlgorithm):
         except AttributeError:
             self.flags = flags\
 
+
     def __call__(self, reference: Image, target: Image) -> Image:
         """
         Calculate optical flow between reference and target images.
         """
         if reference.shape != target.shape:
-            raise ValueError("Reference and target images must have the same dimensions.")
+            raise ValueError(
+                "Reference and target images must have the same dimensions.")
 
         logger.info("Eseguo algoritmo cv2.calcOpticalFlowFarneback")
-        logger.debug(f"{reference.shape = }, {reference.image.dtype = }")
-        logger.debug(f"{target.shape = }, {target.image.dtype = }")
+        logger.debug(f"{reference.shape=}, {reference.image.dtype=}")
+        logger.debug(f"{target.shape=}, {target.image.dtype=}")
 
         pixel_offsets = cv2.calcOpticalFlowFarneback(prev=reference.image, next=target.image,
                                                      flow=self.flow,
@@ -240,8 +245,8 @@ class SkiOpticalFlowILK(OTAlgorithm):
         Calculate optical flow between reference and target images using ILK method.
         """
         logger.info("Eseguo algoritmo skimage.registration.optical_flow_ilk")
-        logger.debug(f"{reference.shape = }, {reference.image.dtype = }")
-        logger.debug(f"{target.shape = }, {target.image.dtype = }")
+        logger.debug(f"{reference.shape=}, {reference.image.dtype=}")
+        logger.debug(f"{target.shape=}, {target.image.dtype=}")
 
         pixel_offsets = optical_flow_ilk(reference.image, target.image, radius=self.radius,
                                          num_warp=self.num_warp, gaussian=self.gaussian,
@@ -279,8 +284,8 @@ class SkiOpticalFlowTVL1(OTAlgorithm):
         Calculate optical flow between reference and target images using TVL1 method.
         """
         logger.info("Eseguo algoritmo skimage.registration.optical_flow_tvl1")
-        logger.debug(f"{reference.image.shape = }, {reference.image.dtype = }")
-        logger.debug(f"{target.image.shape = }, {target.image.dtype = }")
+        logger.debug(f"{reference.image.shape=}, {reference.image.dtype=}")
+        logger.debug(f"{target.image.shape=}, {target.image.dtype=}")
 
         pixel_offsets = optical_flow_tvl1(
             reference.image, target.image,
