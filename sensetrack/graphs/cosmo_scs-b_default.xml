@@ -1,31 +1,43 @@
-<graph id="Graph">
+<graph id="Cosmo-SkyMed_HIMAGE_SCS-B[Lin+ML+TC+SS]">
   <version>1.0</version>
   <node id="Read">
     <operator>Read</operator>
     <sources/>
     <parameters class="com.bc.ceres.binding.dom.XppDomElement">
       <useAdvancedOptions>false</useAdvancedOptions>
-      <file>${f}</file>
+      <file>${input}</file>
       <formatName>CosmoSkymed</formatName>
       <copyMetadata>true</copyMetadata>
       <bandNames/>
-      <!-- <pixelRegion>0,0,19661,17912</pixelRegion> -->
       <maskNames/>
     </parameters>
   </node>
   <node id="LinearToFromdB">
     <operator>LinearToFromdB</operator>
     <sources>
-      <sourceProduct refid="Multilook"/>
+      <sourceProduct refid="Read"/>
     </sources>
     <parameters class="com.bc.ceres.binding.dom.XppDomElement">
       <sourceBands/>
     </parameters>
   </node>
+  <node id="Multilook">
+    <operator>Multilook</operator>
+    <sources>
+      <sourceProduct refid="LinearToFromdB"/>
+    </sources>
+    <parameters class="com.bc.ceres.binding.dom.XppDomElement">
+      <sourceBands/>
+      <nRgLooks>${nRgLooks}</nRgLooks>
+      <nAzLooks>${nAzLooks}</nAzLooks>
+      <outputIntensity>true</outputIntensity>
+      <grSquarePixel>true</grSquarePixel>
+    </parameters>
+  </node>
   <node id="Terrain-Correction">
     <operator>Terrain-Correction</operator>
     <sources>
-      <sourceProduct refid="LinearToFromdB"/>
+      <sourceProduct refid="Multilook"/>
     </sources>
     <parameters class="com.bc.ceres.binding.dom.XppDomElement">
       <sourceBands/>
@@ -35,10 +47,8 @@
       <externalDEMApplyEGM>true</externalDEMApplyEGM>
       <demResamplingMethod>BILINEAR_INTERPOLATION</demResamplingMethod>
       <imgResamplingMethod>BILINEAR_INTERPOLATION</imgResamplingMethod>
-      <!-- <pixelSpacingInMeter>2.2014619881382536</pixelSpacingInMeter> -->
-      <pixelSpacingInMeter>${rm}</pixelSpacingInMeter>
-      <!-- <pixelSpacingInDegree>1.9776069513527416E-5</pixelSpacingInDegree> -->
-      <mapProjection>EPSG:32632</mapProjection>
+      <!-- <pixelSpacingInMeter>${resolution}</pixelSpacingInMeter> -->
+      <mapProjection>${mapProjection}</mapProjection>
       <alignToStandardGrid>false</alignToStandardGrid>
       <standardGridOriginX>0.0</standardGridOriginX>
       <standardGridOriginY>0.0</standardGridOriginY>
@@ -69,26 +79,12 @@
     <parameters class="com.bc.ceres.binding.dom.XppDomElement">
       <sourceBands/>
       <tiePointGrids/>
-      <!-- <region>0,0,0,0</region> -->
       <referenceBand/>
-      <geoRegion>${subset}</geoRegion>
+      <geoRegion>${geoRegion}</geoRegion>
       <subSamplingX>1</subSamplingX>
       <subSamplingY>1</subSamplingY>
       <fullSwath>false</fullSwath>
       <copyMetadata>false</copyMetadata>
-    </parameters>
-  </node>
-  <node id="Multilook">
-    <operator>Multilook</operator>
-    <sources>
-      <sourceProduct refid="Read"/>
-    </sources>
-    <parameters class="com.bc.ceres.binding.dom.XppDomElement">
-      <sourceBands/>
-      <nRgLooks>1</nRgLooks>
-      <nAzLooks>1</nAzLooks>
-      <outputIntensity>false</outputIntensity>
-      <grSquarePixel>true</grSquarePixel>
     </parameters>
   </node>
   <node id="Write">
@@ -97,7 +93,7 @@
       <sourceProduct refid="Subset"/>
     </sources>
     <parameters class="com.bc.ceres.binding.dom.XppDomElement">
-      <file>${o}</file>
+      <file>${output}</file>
       <formatName>GeoTIFF</formatName>
     </parameters>
   </node>

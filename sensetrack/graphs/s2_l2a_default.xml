@@ -1,9 +1,9 @@
-<graph id="S2_L2A_Resample_Export"> 
+<graph id="S2_L2A_Resample_Export">
   <version>1.0</version> 
   <node id="Read"> 
     <operator>Read</operator> 
     <parameters> 
-      <file>${f}</file> 
+      <file>${input}</file> 
     </parameters> 
   </node> 
   <node id="Resample"> 
@@ -34,7 +34,7 @@
       <sourceProduct refid="BandSelect"/>
     </sources>
     <parameters class="com.bc.ceres.binding.dom.XppDomElement">
-      <geoRegion>${subset}</geoRegion>
+      <geoRegion>${geoRegion}</geoRegion>
     </parameters>
   </node>
   <node id="Write"> 
@@ -43,7 +43,7 @@
       <sourceProduct>Subset</sourceProduct> 
     </sources> 
     <parameters> 
-      <file>${o}</file> 
+      <file>${output}</file> 
       <formatName>GeoTIFF</formatName> 
     </parameters> 
   </node> 

@@ -4,26 +4,17 @@ from pathlib import Path
 
 from sensetrack.cosmo import lib
 from sensetrack.log import setup_logger
-from sensetrack.snap_gpt.lib import GPTSubsetter, Graphs, SARPreprocessing
-
+from sensetrack.snap_gpt.lib import (GPTSubsetter, Graphs, SARPreprocessor,
+                                     SARPreprocessing)
 
 logger = setup_logger(__name__)
 
 
-class CSKPreprocessor:
+class CSKPreprocessor(SARPreprocessor):
+    REFERENCE_RES = 6.0
+
     def __init__(self, SUBSET: GPTSubsetter, PROCESS: SARPreprocessing) -> None:
-        if not isinstance(PROCESS, SARPreprocessing):
-            raise TypeError(
-                f"PROCESS must be SARPreprocessing enum, got {type(PROCESS)}")
-
-        self._PROCESS = PROCESS.value
-        self.SUBSET = SUBSET
-        GRAPH_PATH = Graphs._member_map_[PROCESS.value].value
-
-        if not GRAPH_PATH.is_file():
-            raise FileNotFoundError(f"Graph file not found: {GRAPH_PATH}")
-
-        self.GRAPH = GRAPH_PATH
+        super().__init__(SUBSET, SUBSET)
 
     def run(self, CSKFILE: str | Path) -> None:
 
@@ -40,10 +31,10 @@ class CSKPreprocessor:
 
         sp.run(["gpt.exe",
                 self.GRAPH,
-                f'-Pf='+str(CSKFILE),
+                f'-Pinput='+str(CSKFILE),
                 '-Psubset='+self.SUBSET.geometry.__str__(),
-                '-Prm=5.0',
-                '-Po='+str(CSKFILE.parent / OUTPUT_FILE)
+                f'-Prm={self.REFERENCE_RES}',
+                '-Pooutput='+str(CSKFILE.parent / OUTPUT_FILE)
                 ],
                shell=True)
 

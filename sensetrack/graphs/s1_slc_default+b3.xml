@@ -1,16 +1,10 @@
-<graph id="Graph">
+<graph id="S1_IW_SLC[Orb+TNR+Cal+Deb+SS+ML+SF+TC+Band3]">
   <version>1.0</version>
   <node id="Read">
     <operator>Read</operator>
     <sources/>
     <parameters class="com.bc.ceres.binding.dom.XppDomElement">
-      <useAdvancedOptions>false</useAdvancedOptions>
       <file>${f}</file>
-      <formatName>SENTINEL-1</formatName>
-      <copyMetadata>true</copyMetadata>
-      <bandNames/>
-      <pixelRegion>0,0,75434,13724</pixelRegion>
-      <maskNames/>
     </parameters>
   </node>
   <node id="ApplyOrbit">
@@ -18,7 +12,7 @@
     <sources>
       <sourceProduct refid="Read"/>
     </sources>
-    <parameters class="com.bc.ceres.binding.dom.XppDomElement">
+    <parameters>
       <orbitType>Sentinel Precise (Auto Download)</orbitType>
       <polyDegree>3</polyDegree>
       <continueOnFail>false</continueOnFail>
@@ -32,7 +26,6 @@
     <parameters class="com.bc.ceres.binding.dom.XppDomElement">
       <selectedPolarisations/>
       <removeThermalNoise>true</removeThermalNoise>
-      <outputNoise>false</outputNoise>
       <reIntroduceThermalNoise>false</reIntroduceThermalNoise>
     </parameters>
   </node>
@@ -44,12 +37,10 @@
     <parameters class="com.bc.ceres.binding.dom.XppDomElement">
       <sourceBands/>
       <auxFile>Latest Auxiliary File</auxFile>
-      <externalAuxFile/>
       <outputImageInComplex>false</outputImageInComplex>
       <outputImageScaleInDb>false</outputImageScaleInDb>
       <createGammaBand>false</createGammaBand>
       <createBetaBand>false</createBetaBand>
-      <selectedPolarisations/>
       <outputSigmaBand>true</outputSigmaBand>
       <outputGammaBand>false</outputGammaBand>
       <outputBetaBand>false</outputBetaBand>
@@ -64,15 +55,24 @@
       <selectedPolarisations/>
     </parameters>
   </node>
-  <node id="Multilook">
-    <operator>Multilook</operator>
+  <node id="Subset">
+    <operator>Subset</operator>
     <sources>
       <sourceProduct refid="TOPSAR-Deburst"/>
     </sources>
     <parameters class="com.bc.ceres.binding.dom.XppDomElement">
+      <geoRegion>${subset}</geoRegion>
+    </parameters>
+  </node>
+  <node id="Multilook">
+    <operator>Multilook</operator>
+    <sources>
+      <sourceProduct refid="Subset"/>
+    </sources>
+    <parameters class="com.bc.ceres.binding.dom.XppDomElement">
       <sourceBands/>
-      <nRgLooks>4</nRgLooks>
-      <nAzLooks>1</nAzLooks>
+      <nRgLooks>${nRgLooks}</nRgLooks>
+      <nAzLooks>${nAzLooks}</nAzLooks>
       <outputIntensity>true</outputIntensity>
       <grSquarePixel>true</grSquarePixel>
     </parameters>
@@ -102,59 +102,19 @@
     <sources>
       <sourceProduct refid="Speckle-Filter"/>
     </sources>
-    <parameters class="com.bc.ceres.binding.dom.XppDomElement">
-      <sourceBands/>
+    <parameters>
       <demName>SRTM 1Sec HGT</demName>
-      <externalDEMFile/>
-      <externalDEMNoDataValue>0.0</externalDEMNoDataValue>
-      <externalDEMApplyEGM/>
       <demResamplingMethod>BILINEAR_INTERPOLATION</demResamplingMethod>
-      <imgResamplingMethod>BILINEAR_INTERPOLATION</imgResamplingMethod>
-      <pixelSpacingInMeter>14</pixelSpacingInMeter>
-      <mapProjection>EPSG:32632</mapProjection>
-      <alignToStandardGrid>false</alignToStandardGrid>
-      <standardGridOriginX>0.0</standardGridOriginX>
-      <standardGridOriginY>0.0</standardGridOriginY>
+      <mapProjection>${mapProjection}</mapProjection>
       <nodataValueAtSea>true</nodataValueAtSea>
-      <saveDEM>false</saveDEM>
-      <saveLatLon>false</saveLatLon>
-      <saveIncidenceAngleFromEllipsoid>false</saveIncidenceAngleFromEllipsoid>
-      <saveLocalIncidenceAngle>false</saveLocalIncidenceAngle>
-      <saveProjectedLocalIncidenceAngle>false</saveProjectedLocalIncidenceAngle>
-      <saveSelectedSourceBand>true</saveSelectedSourceBand>
-      <saveLayoverShadowMask>false</saveLayoverShadowMask>
       <outputComplex>false</outputComplex>
       <applyRadiometricNormalization>false</applyRadiometricNormalization>
-      <saveSigmaNought>false</saveSigmaNought>
-      <saveGammaNought>false</saveGammaNought>
-      <saveBetaNought>false</saveBetaNought>
-      <incidenceAngleForSigma0/>
-      <incidenceAngleForGamma0/>
-      <auxFile>Latest Auxiliary File</auxFile>
-      <externalAuxFile/>
-    </parameters>
-  </node>
-  <node id="Subset">
-    <operator>Subset</operator>
-    <sources>
-      <sourceProduct refid="TerrainCorrection"/>
-    </sources>
-    <parameters class="com.bc.ceres.binding.dom.XppDomElement">
-      <sourceBands>Sigma0_VH,Sigma0_VV</sourceBands>
-      <tiePointGrids/>
-      <region>0,0,0,0</region>
-      <referenceBand/>
-      <geoRegion>${subset}</geoRegion>
-      <subSamplingX>1</subSamplingX>
-      <subSamplingY>1</subSamplingY>
-      <fullSwath>false</fullSwath>
-      <copyMetadata>false</copyMetadata>
     </parameters>
   </node>
   <node id="BandMaths">
     <operator>BandMaths</operator>
     <sources>
-      <sourceProduct refid="Subset"/>
+      <sourceProduct refid="TerrainCorrection"/>
     </sources>
     <parameters class="com.bc.ceres.binding.dom.XppDomElement">
       <targetBands>
@@ -187,47 +147,8 @@
       <sourceProduct refid="BandMerge"/>
     </sources>
     <parameters class="com.bc.ceres.binding.dom.XppDomElement">
-      <file>${o}</file>
-      <formatName>GeoTIFF</formatName>
+      <file>${output}</file>
+      <formatName>GeoTiff</formatName>
     </parameters>
   </node>
-  <applicationData id="Presentation">
-    <Description/>
-    <node id="Read">
-      <displayPosition x="13.0" y="192.0"/>
-    </node>
-    <node id="ApplyOrbit">
-      <displayPosition x="99.0" y="191.0"/>
-    </node>
-    <node id="ThermalNoiseRemoval">
-      <displayPosition x="199.0" y="192.0"/>
-    </node>
-    <node id="Calibration">
-      <displayPosition x="358.0" y="194.0"/>
-    </node>
-    <node id="TOPSAR-Deburst">
-      <displayPosition x="455.0" y="193.0"/>
-    </node>
-    <node id="Multilook">
-      <displayPosition x="601.0" y="194.0"/>
-    </node>
-    <node id="Speckle-Filter">
-      <displayPosition x="714.0" y="200.0"/>
-    </node>
-    <node id="TerrainCorrection">
-      <displayPosition x="862.0" y="198.0"/>
-    </node>
-    <node id="Subset">
-      <displayPosition x="1037.0" y="199.0"/>
-    </node>
-    <node id="BandMaths">
-      <displayPosition x="1063.0" y="145.0"/>
-    </node>
-    <node id="BandMerge">
-      <displayPosition x="1165.0" y="189.0"/>
-    </node>
-    <node id="Write">
-      <displayPosition x="1270.0" y="188.0"/>
-    </node>
-  </applicationData>
 </graph>

@@ -1,4 +1,4 @@
-<graph id="Graph">
+<graph id="S1_IW_SLC[Orb+TNR+Cal+Deb+SS+ML+TC+Band3]">
   <version>1.0</version>
   <node id="Read">
     <operator>Read</operator>
@@ -55,24 +55,15 @@
       <selectedPolarisations/>
     </parameters>
   </node>
-  <node id="Subset">
-    <operator>Subset</operator>
+  <node id="Multilook">
+    <operator>Multilook</operator>
     <sources>
       <sourceProduct refid="TOPSAR-Deburst"/>
     </sources>
     <parameters class="com.bc.ceres.binding.dom.XppDomElement">
-      <geoRegion>${subset}</geoRegion>
-    </parameters>
-  </node>
-  <node id="Multilook">
-    <operator>Multilook</operator>
-    <sources>
-      <sourceProduct refid="Subset"/>
-    </sources>
-    <parameters class="com.bc.ceres.binding.dom.XppDomElement">
       <sourceBands/>
-      <nRgLooks>2</nRgLooks>
-      <nAzLooks>1</nAzLooks>
+      <nRgLooks>${nRgLooks}</nRgLooks>
+      <nAzLooks>${nAzLooks}</nAzLooks>
       <outputIntensity>true</outputIntensity>
       <grSquarePixel>true</grSquarePixel>
     </parameters>
@@ -85,19 +76,59 @@
     <parameters>
       <demName>SRTM 1Sec HGT</demName>
       <demResamplingMethod>BILINEAR_INTERPOLATION</demResamplingMethod>
-      <mapProjection>EPSG:32632</mapProjection>
+      <mapProjection>${mapProjection}</mapProjection>
       <nodataValueAtSea>true</nodataValueAtSea>
       <outputComplex>false</outputComplex>
       <applyRadiometricNormalization>false</applyRadiometricNormalization>
     </parameters>
   </node>
+  <node id="bandMathsNode">
+    <operator>BandMaths</operator>
+    <sources>
+        <sourceProduct refid="TerrainCorrection"/>
+    </sources>
+    <parameters>
+        <targetBands>
+            <targetBand>
+                <name>Sigma0_VH</name>
+                <expression>Sigma0_VH</expression>
+                <type>float32</type>
+                <noDataValue>-9999</noDataValue>
+                <spectralBandIndex>1</spectralBandIndex>
+            </targetBand>
+            <targetBand>
+                <name>Sigma0_VV</name>
+                <expression>Sigma0_VV</expression>
+                <type>float32</type>
+                <noDataValue>-9999</noDataValue>
+                <spectralBandIndex>2</spectralBandIndex>
+            </targetBand>
+            <targetBand>
+                <name>Sigma0_VV/Sigma0_VH</name>
+                <expression>Sigma0_VV/Sigma0_VH</expression>
+                <type>float32</type>
+                <noDataValue>-9999</noDataValue>
+                <spectralBandIndex>3</spectralBandIndex>
+            </targetBand>
+        </targetBands>
+    </parameters>
+  </node>
+  <node id="Subset">
+    <operator>Subset</operator>
+    <sources>
+      <sourceProduct refid="bandMathsNode"/>
+    </sources>
+    <parameters class="com.bc.ceres.binding.dom.XppDomElement">
+      <geoRegion>${subset}</geoRegion>
+    </parameters>
+  </node>
   <node id="Write">
     <operator>Write</operator>
     <sources>
-      <sourceProduct refid="TerrainCorrection"/>
+      <sourceProduct refid="Subset"/>
     </sources>
     <parameters class="com.bc.ceres.binding.dom.XppDomElement">
-      <file>${o}</file>
+      <file>${output}</file>
       <formatName>GeoTiff</formatName>
     </parameters>
   </node>

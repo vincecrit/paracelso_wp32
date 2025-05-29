@@ -3,29 +3,21 @@ import sys
 from pathlib import Path
 
 from sensetrack.log import setup_logger
-from sensetrack.sentinel.manifest_file import read_orbit_properties
-from sensetrack.snap_gpt.lib import GPTSubsetter, Graphs, SARPreprocessing
+from sensetrack.sentinel.utils import read_orbit_properties
+from sensetrack.snap_gpt.lib import (S1_IW_SLC, GPTSubsetter, SARPreprocessing,
+                                     SARPreprocessor)
 
 logger = setup_logger(__name__)
 
 
-class S1Preprocessor:
+class S1Preprocessor(SARPreprocessor):
     def __init__(self, SUBSET: GPTSubsetter, PROCESS: SARPreprocessing) -> None:
-        if not isinstance(PROCESS, SARPreprocessing):
-            raise TypeError(
-                f"PROCESS must be SARPreprocessing enum, got {type(PROCESS)}")
+        super().__init__(SUBSET, PROCESS)
 
-        self._PROCESS = PROCESS.value
-        self.SUBSET = SUBSET
-        GRAPH_PATH = Graphs._member_map_[PROCESS.value].value
+    def run(self, SARFILE: str | Path, CRS: str = "EPSG:32632") -> None:
 
-        if not GRAPH_PATH.is_file():
-            raise FileNotFoundError(f"Graph file not found: {GRAPH_PATH}")
-
-        self.GRAPH = GRAPH_PATH
-
-    def run(self, SARFILE: str | Path) -> None:
-
+        ml = self.estimate_multilook_parms(SARFILE, S1_IW_SLC(), 1)
+        res = int(min(ml.Estimated_AzimuthResolution, ml.Estimated_RangeResolution))
         SARFILE = Path(SARFILE)
 
         if not SARFILE.suffix == '.zip':
@@ -43,9 +35,13 @@ class S1Preprocessor:
 
         sp.run(["gpt.exe",
                 self.GRAPH,
-                f'-Pf='+str(SARFILE),
-                '-Psubset='+self.SUBSET.geometry.__str__(),
-                '-Po='+str(SARFILE.parent / OUTPUT_FILE)
+                f'-Pinput={SARFILE}',
+                f'-PnRgLooks={ml.Num_Range_LOOKS}',
+                f'-PnAzLooks={ml.Num_Azimuth_LOOKS}',
+                f'-PgeoRegion={self.SUBSET.geometry.__str__()}',
+                f'-Poutput={str(SARFILE.parent / OUTPUT_FILE)}',
+                f'-Presolution={res}',
+                f'-PmapProjection={CRS}',
                 ],
                shell=True)
 

@@ -1,10 +1,10 @@
-<graph id="Graph">
+<graph id="S1_IW_GRD[Orb+TNR+TC]">
   <version>1.0</version>
   <node id="Read">
     <operator>Read</operator>
     <sources/>
     <parameters class="com.bc.ceres.binding.dom.XppDomElement">
-      <file>${f}</file>
+      <file>${input}</file>
     </parameters>
   </node>
   <node id="ApplyOrbit">
@@ -37,7 +37,7 @@
     <parameters>
       <demName>SRTM 1Sec HGT</demName>
       <demResamplingMethod>BILINEAR_INTERPOLATION</demResamplingMethod>
-      <mapProjection>EPSG:32632</mapProjection>
+      <mapProjection>${mapProjection}</mapProjection>
       <nodataValueAtSea>true</nodataValueAtSea>
       <outputComplex>false</outputComplex>
       <applyRadiometricNormalization>false</applyRadiometricNormalization>
@@ -49,7 +49,7 @@
       <sourceProduct refid="TerrainCorrection"/>
     </sources>
     <parameters class="com.bc.ceres.binding.dom.XppDomElement">
-      <file>${o}</file>
+      <file>${output}</file>
       <formatName>GeoTiff</formatName>
     </parameters>
   </node>

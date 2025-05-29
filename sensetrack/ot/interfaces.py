@@ -35,8 +35,7 @@ import cv2
 import numpy as np
 from rasterio import CRS, Affine
 
-from log import setup_logger
-
+from sensetrack.log import setup_logger
 
 logger = setup_logger(__name__)
 
