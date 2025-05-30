@@ -1,5 +1,4 @@
 import subprocess as sp
-import sys
 from pathlib import Path
 
 from sensetrack.log import setup_logger
@@ -17,7 +16,8 @@ class S1Preprocessor(SARPreprocessor):
     def run(self, SARFILE: str | Path, CRS: str = "EPSG:32632") -> None:
 
         ml = self.estimate_multilook_parms(SARFILE, S1_IW_SLC(), 1)
-        res = int(min(ml.Estimated_AzimuthResolution, ml.Estimated_RangeResolution))
+        # res = int(min(ml.Estimated_AzimuthResolution, ml.Estimated_RangeResolution))
+        logger.debug(f"Parametri MultiLook e risoluzione finale: {ml}")
         SARFILE = Path(SARFILE)
 
         if not SARFILE.suffix == '.zip':
@@ -40,34 +40,79 @@ class S1Preprocessor(SARPreprocessor):
                 f'-PnAzLooks={ml.Num_Azimuth_LOOKS}',
                 f'-PgeoRegion={self.SUBSET.geometry.__str__()}',
                 f'-Poutput={str(SARFILE.parent / OUTPUT_FILE)}',
-                f'-Presolution={res}',
-                f'-PmapProjection={CRS}',
+                f'-PmapProjection={CRS}'
                 ],
                shell=True)
 
 
-if __name__ == "__main__":
+def main(preprocessor, file, workflow, aoi):
 
     import sys
 
     __processes = list(SARPreprocessing._member_map_.keys())
 
-    assert sys.argv[2].upper() in __processes
+    assert workflow.upper() in __processes
 
     try:
-        SUBSET = GPTSubsetter.get_subset(sys.argv[1])
+        SUBSET = GPTSubsetter.get_subset(aoi)
 
     except (FileNotFoundError, ValueError) as err:
         logger.error(f"Failed to get AOI: {err}")
         exit(-1)
 
     PROCESS = eval(f"SARPreprocessing.{sys.argv[2].upper()}")
-    SARFILE = Path(sys.argv[3])
+    SARFILE = Path(file)
 
     if not SARFILE.is_file():
         print(f"The file {SARFILE} does not exist.")
         exit(-1)
 
     else:
-        S1Preprocessor(SUBSET, PROCESS).run(SARFILE)
+        preprocessor(SUBSET, PROCESS).run(SARFILE)
         exit(1)
+
+
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--file", required=True,
+                        help="Percorso al file da elaborare", type=str)
+    parser.add_argument("--workflow", required=True,
+                        help="Workflow da utilizzare per il processamento",
+                        type=str)
+    parser.add_argument("--aoi", required=True,
+                        help="Area di interesse (ESRI Shapefile o GeoPackage)",
+                        type=str)
+
+    args = vars(parser.parse_args())
+
+    main(S1Preprocessor, **args)
+
+
+# if __name__ == "__main__":
+
+#     import sys
+
+#     __processes = list(SARPreprocessing._member_map_.keys())
+
+#     assert sys.argv[2].upper() in __processes
+
+#     try:
+#         SUBSET = GPTSubsetter.get_subset(sys.argv[1])
+
+#     except (FileNotFoundError, ValueError) as err:
+#         logger.error(f"Failed to get AOI: {err}")
+#         exit(-1)
+
+#     PROCESS = eval(f"SARPreprocessing.{sys.argv[2].upper()}")
+#     SARFILE = Path(sys.argv[3])
+
+#     if not SARFILE.is_file():
+#         print(f"The file {SARFILE} does not exist.")
+#         exit(-1)
+
+#     else:
+#         S1Preprocessor(SUBSET, PROCESS).run(SARFILE)
+#         exit(1)

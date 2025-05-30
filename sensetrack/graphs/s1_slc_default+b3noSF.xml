@@ -4,7 +4,7 @@
     <operator>Read</operator>
     <sources/>
     <parameters class="com.bc.ceres.binding.dom.XppDomElement">
-      <file>${f}</file>
+      <file>${input}</file>
     </parameters>
   </node>
   <node id="ApplyOrbit">
@@ -119,7 +119,7 @@
       <sourceProduct refid="bandMathsNode"/>
     </sources>
     <parameters class="com.bc.ceres.binding.dom.XppDomElement">
-      <geoRegion>${subset}</geoRegion>
+      <geoRegion>${geoRegion}</geoRegion>
     </parameters>
   </node>
   <node id="Write">

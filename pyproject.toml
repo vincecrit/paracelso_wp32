@@ -7,7 +7,7 @@ authors = [
 maintainers = [
     { name = "Vincenzo Critelli", email = "vince.crit@gmail.com" }
 ]
-version = "1.0dev4"
+version = "1.0"
 dependencies = [
     "numpy>=1.23",
     "pandas>=1.5",
@@ -28,15 +28,14 @@ classifiers = [
     "Development Status :: 4 - Beta",
     "Programming Language :: Python"
 ]
-license = { file = "LICENSE" }
+license-files = ["LICENSE"]
 
 [build-system]
 requires = ["setuptools>=61", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
-include = ["sensetrack/snap_gpt/*.yaml", "sensetrack/graphs/*.xml"]
+include = ["sensetrack*", "sensetrack/graphs/*.xml"]
 
 [tool.setuptools.package-data]
-"sensetrack.snap_gpt" = ["*.yaml"]
 "sensetrack.graphs" = ["*.xml"]

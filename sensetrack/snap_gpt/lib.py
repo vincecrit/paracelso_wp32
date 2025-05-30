@@ -100,7 +100,9 @@ class SARPreprocessor(ABC):
 
         self.GRAPH = GRAPH_PATH
 
-    def estimate_multilook_parms(self, filename: str, native_resolution: SARResolutions, n_az_looks: int = 1):
+    def estimate_multilook_parms(self, filename: str,
+                                 native_resolution: SARResolutions,
+                                 n_az_looks: int = 1):
 
         if isinstance(native_resolution, S1_IW_SLC):
             incidence_angle = s1_mean_incidence_angle_rad(filename)
