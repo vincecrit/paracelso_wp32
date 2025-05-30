@@ -23,7 +23,7 @@ from skimage.registration import (optical_flow_ilk, optical_flow_tvl1,
 from skimage.util import view_as_windows
 from tqdm import tqdm
 
-from log import setup_logger
+from sensetrack.log import setup_logger
 from sensetrack.ot.interfaces import Image, OTAlgorithm
 
 logger = setup_logger(__name__)

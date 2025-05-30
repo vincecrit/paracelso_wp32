@@ -1,7 +1,7 @@
 import argparse
 from pathlib import Path
 
-from log import setup_logger
+from sensetrack.log import setup_logger
 from sensetrack.ot import lib
 from sensetrack.ot.helpmsg import BAND, NODATA, OUTPUT, REFERENCE, TARGET
 from sensetrack.ot.image_processing import dispatcher
