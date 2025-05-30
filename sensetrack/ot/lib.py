@@ -10,7 +10,7 @@ from rasterio.errors import (DriverCapabilityError, DriverRegistrationError,
                              PathError, RasterioIOError)
 from rasterio.warp import Resampling, calculate_default_transform, reproject
 
-from log import setup_logger
+from sensetrack.log import setup_logger
 from sensetrack.ot.interfaces import Image
 
 logger = setup_logger(__name__)
