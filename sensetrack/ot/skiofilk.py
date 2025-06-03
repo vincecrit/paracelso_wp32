@@ -1,4 +1,21 @@
-from sensetrack.ot.algoritmi import SkiOpticalFlowILK
+"""
+skiofilk.py
+This module provides a command-line interface (CLI) for configuring and running the `SkiOpticalFlowILK` algorithm, 
+which is part of the sensetrack optical flow toolkit. The CLI allows users to specify algorithm parameters such as 
+radius, number of warps, Gaussian smoothing, and prefiltering via command-line arguments.
+
+Classes:
+
+    SKIOFILK_CLI: Inherits from BaseCLI and implements argument parsing and algorithm instantiation for `SkiOpticalFlowILK`.
+
+Arguments:
+
+    --radius (int): Neighborhood radius for the optical flow algorithm. Default is 4.
+    --num_warp (int): Number of warping iterations. Default is 3.
+    --gaussian: Enable Gaussian smoothing. Optional flag.
+    --prefilter: Enable prefiltering. Optional flag.
+"""
+from sensetrack.ot.algorithms import SkiOpticalFlowILK
 from sensetrack.ot.cli import BaseCLI
 from sensetrack.ot.helpmsg import GAUSSIAN, NUMWARP, PREFILTER, RADIUS
 

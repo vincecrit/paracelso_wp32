@@ -1,30 +1,30 @@
 """
 Module: interfaces
-This module provides classes and functions for handling and processing images with multiple bands. It includes an enumeration for image bands, a class for representing images, and an abstract base class for optical tracking algorithms.
+
+This module defines core classes and utilities for handling multi-band images and implementing optical tracking algorithms.
+
 Classes:
-    - Band: Enumeration for image bands.
-    - Image: Class representing an image with multiple bands.
-    - OTAlgorithm: Abstract base class for optical tracking algorithms.
-Functions:
-    - Image.__init__: Initialize an Image instance.
-    - Image.__new__: Create a new instance of Image.
-    - Image.__repr__: Return a string representation of the Image instance.
-    - Image.__len__: Return the number of bands in the image.
-    - Image.__iter__: Return an iterator over the band arrays.
-    - Image.__getitem__: Get a specific band by index.
+    - Image: Represents an image with multiple bands, including georeferencing and nodata handling.
+    - OTAlgorithm: Abstract base class for optical tracking algorithms, providing serialization and utility methods.
+
+Functions and Methods:
+    - Image.__init__: Initializes an Image instance with image data, affine transform, CRS, and nodata value.
+    - Image.__new__: Allocates a new Image instance.
+    - Image.__repr__: Returns a string representation of the Image.
+    - Image.__len__: Returns the number of bands in the image.
+    - Image.__iter__: Iterates over the image bands.
+    - Image.__getitem__: Retrieves a specific band by index.
     - Image.__get_bandnames: Returns a tuple of band names.
-    - Image.bandnames: Get a tuple of the band names.
-    - Image.split_channels: Split the image into its individual channels.
-    - Image.is_coregistered: Check if the image is coregistered with another image.
-    - Image.get_band: Get a specific band from the image.
-    - OTAlgorithm.library: libreria di appartenenza.
-    - OTAlgorithm.from_dict: Create an instance from a dictionary.
-    - OTAlgorithm.from_JSON: Create an instance from a JSON file.
-    - OTAlgorithm.from_YAML: Create an instance from a YAML file.
-    - OTAlgorithm.toJSON: Convert the instance to a JSON string and save to a file.
-    - OTAlgorithm.show_name: Return the name of the algorithm class.
-    - OTAlgorithm._to_displacements: Convert pixel offsets to displacements.
-    - OTAlgorithm.__call__: Call the algorithm.
+    - Image.split_channels: Splits the image into its individual channels.
+    - Image.is_coregistered: Checks if another image is coregistered with this one.
+    - Image.get_band: Retrieves a specific band as a new Image instance.
+    - OTAlgorithm: Abstract class for algorithm implementation.
+    - OTAlgorithm.from_dict: Instantiates an algorithm from a dictionary.
+    - OTAlgorithm.from_JSON: Instantiates an algorithm from a JSON file.
+    - OTAlgorithm.from_YAML: Instantiates an algorithm from a YAML file.
+    - OTAlgorithm.toJSON: Serializes the algorithm parameters to a JSON file.
+    - OTAlgorithm._to_displacements: Converts pixel offsets to physical displacements.
+    - OTAlgorithm.__call__: Abstract method for running the algorithm.
 """
 import json
 from abc import ABC

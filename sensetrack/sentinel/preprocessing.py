@@ -1,3 +1,40 @@
+"""
+sensetrack.sentinel.preprocessing
+=================================
+This module provides preprocessing utilities for Sentinel-1 SAR data using SNAP GPT workflows.
+It defines the `S1Preprocessor` class, which orchestrates the application of SNAP GPT graphs
+to Sentinel-1 SLC products, including subsetting and SAR-specific preprocessing steps.
+Classes
+-------
+- S1Preprocessor: Inherits from `SARPreprocessor` and implements the preprocessing pipeline
+    for Sentinel-1 data, including multilook estimation, orbit property extraction, and
+    execution of SNAP GPT workflows.
+Functions
+---------
+- main(preprocessor, file, workflow, aoi): Entry point for command-line execution. Parses
+    arguments, validates inputs, and runs the specified preprocessing workflow.
+Usage
+-----
+This module is intended to be run as a script with command-line arguments specifying the
+input SAR file, the desired processing workflow, and the area of interest (AOI) as a
+shapefile or GeoPackage.
+Example:
+        python preprocessing.py --file <SARFILE.zip> --workflow <WORKFLOW> --aoi <AOI_FILE>
+Dependencies
+------------
+- sensetrack.log
+- sensetrack.sentinel.utils
+- sensetrack.snap_gpt.lib
+- SNAP GPT (gpt.exe must be available in the system path)
+Raises
+------
+- ValueError: If the input SAR file is not a zip archive.
+- AssertionError: If the specified workflow is not supported.
+- FileNotFoundError, ValueError: If the AOI file is invalid or not found.
+Logging
+-------
+The module uses a logger to provide debug and error messages during processing.
+"""
 import subprocess as sp
 from pathlib import Path
 

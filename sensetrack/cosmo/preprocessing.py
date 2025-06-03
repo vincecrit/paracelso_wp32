@@ -1,3 +1,41 @@
+"""
+preprocessing.py
+This module provides preprocessing utilities for COSMO-SkyMed (CSK) and COSMO Second Generation (CSG) Synthetic Aperture Radar (SAR) products.
+It defines preprocessor classes for both CSK and CSG product types, enabling automated multi-look parameter estimation, subsetting, and execution
+of SNAP GPT workflows for SAR data processing.
+
+Classes:
+
+    - CSKPreprocessor: Preprocessor for CSK SAR products. Handles multi-look estimation, file validation, and invokes SNAP GPT workflows.
+    - CSGPreprocessor: Preprocessor for CSG SAR products. Similar to CSKPreprocessor but tailored for CSG product metadata and conventions.
+
+Functions:
+
+    - main(preprocessor, file, workflow, aoi): Entry point for command-line execution. Parses arguments, validates inputs, and runs the selected preprocessor.
+
+Usage:
+
+    This module is intended to be used as a command-line tool for preprocessing SAR data. It requires specification of the product type (CSK or CSG),
+    the input file, the desired processing workflow, and the area of interest (AOI) as a shapefile or GeoPackage.
+
+Dependencies:
+
+    - sensetrack.cosmo.lib: Provides product metadata parsing and utilities.
+    - sensetrack.log: Logging setup.
+    - sensetrack.snap_gpt.lib: SNAP GPT workflow and subsetting utilities.
+    - subprocess, pathlib, argparse, sys
+
+Example:
+
+    python preprocessing.py --product_type CSK --file /path/to/file.h5 --workflow SOME_WORKFLOW --aoi /path/to/aoi.shp
+
+Raises:
+
+    - ValueError: If the input file is not a valid COSMO format.
+    - AssertionError: If the specified workflow is not supported.
+    - FileNotFoundError: If the AOI file does not exist.
+    - SystemExit: On critical errors or after successful processing.
+"""
 import subprocess as sp
 from pathlib import Path
 

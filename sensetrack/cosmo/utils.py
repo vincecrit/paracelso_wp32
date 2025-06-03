@@ -1,3 +1,7 @@
+"""
+utils.py
+This module provides utility classes and functions for string manipulation within the sensetrack.cosmo package.
+"""
 import math
 from datetime import datetime
 from pathlib import Path

@@ -9,15 +9,15 @@ Functions:
 """
 from enum import Enum, unique
 
-from sensetrack.ot import algoritmi, interfaces
+from sensetrack.ot import algorithms, interfaces
 
 @unique
 class AlgFactory(Enum):
     """Factory class for creating algorithm instances."""
-    OPENCVOF = algoritmi.OpenCVOpticalFlow
-    SKIOFILK = algoritmi.SkiOpticalFlowILK
-    SKIOFTVL1 = algoritmi.SkiOpticalFlowTVL1
-    SKIPCCV = algoritmi.SkiPCC_Vector
+    OPENCVOF = algorithms.OpenCVOpticalFlow
+    SKIOFILK = algorithms.SkiOpticalFlowILK
+    SKIOFTVL1 = algorithms.SkiOpticalFlowTVL1
+    SKIPCCV = algorithms.SkiPCC_Vector
 
 
 def get_method(algname: str) -> interfaces.OTAlgorithm:

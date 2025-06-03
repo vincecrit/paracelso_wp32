@@ -1,3 +1,34 @@
+"""
+This module provides utility functions for managing raster images and geospatial vector data,
+with a focus on loading, saving, coregistration, and conversion between different formats
+using the `rasterio`, `geopandas`, and `opencv` libraries.
+Main Features:
+--------------
+- Load raster images from files, with support for band selection.
+- Convert and save `Image` objects to geospatial raster formats.
+- Convert and save `GeoDataFrame` objects to vector formats (GPKG, SHP).
+- Coregister raster images (alignment and reprojection relative to a reference image).
+- Check for georeferencing and handle special cases.
+- Detailed logging of operations and errors via a custom logger.
+Classes and Functions:
+----------------------
+- `rasterio_open`: Loads raster images using rasterio, with optional band selection.
+- `image_to_rasterio`: Saves an `Image` object to a raster file using rasterio.
+- `geopandas_to_ogr`: Saves a `GeoDataFrame` to a vector file (GPKG, SHP).
+- `write_output`: Writes either raster or vector data to the appropriate file format.
+- `load_images`: Loads a pair of images as `ot.interfaces.Image` objects, checks georeferencing, and performs coregistration if needed.
+- `basic_pixel_coregistration`: Aligns and reprojects a target image to match a reference image.
+- Helper functions for type checking and affine transformation validation.
+Dependencies:
+-------------
+- rasterio
+- geopandas
+- opencv (cv2)
+- numpy
+- sensetrack.log (for logging)
+- sensetrack.ot.interfaces (for the Image class)
+"""
+
 import logging
 from pathlib import Path
 
@@ -156,7 +187,8 @@ def load_images(*args, nodata=None, **kwargs):
 
     else:
         # carico qualsiasi tipo di file con rasterio (tanto legge tutto mwaahahah)
-        reference = Image(*rasterio_open(reference_file, **kwargs), nodata=nodata)
+        reference = Image(
+            *rasterio_open(reference_file, **kwargs), nodata=nodata)
         target = Image(*rasterio_open(target_file, **kwargs), nodata=nodata)
 
         # [2] rasterio associa un oggetto Affine come matrice identità quando la

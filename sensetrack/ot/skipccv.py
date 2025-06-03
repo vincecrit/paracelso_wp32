@@ -1,7 +1,27 @@
-from sensetrack.ot.helpmsg import PHASENORM, STEPSIZE, UPSAMPLE_FACTOR, WINSIZE
+"""
+skipccv.py
+This module provides a command-line interface (CLI) for running the SkiPCC_Vector algorithm from the sensetrack.ot.algorithms package. 
+It extends the BaseCLI class to parse and handle specific arguments related to the SkiPCC_Vector algorithm.
 
-from sensetrack.ot.algoritmi import SkiPCC_Vector
+Classes:
+
+    SKIPCCV_CLI: Command-line interface class for configuring and running the `SkiPCC_Vector` algorithm.
+
+Arguments:
+
+    --phase_norm : bool (default: True)
+        If set, applies phase normalization as described in the PHASENORM help message.
+    --upsmp_fac : float (default: 1.0)
+        Upsampling factor for the algorithm, as described in the UPSAMPLE_FACTOR help message.
+    --step_size : int (default: 1)
+        Step size for the algorithm, as described in the STEPSIZE help message.
+    --winsize : int (default: 4)
+        Window size for the algorithm, as described in the WINSIZE help message.
+"""
+
+from sensetrack.ot.algorithms import SkiPCC_Vector
 from sensetrack.ot.cli import BaseCLI
+from sensetrack.ot.helpmsg import PHASENORM, STEPSIZE, UPSAMPLE_FACTOR, WINSIZE
 
 
 class SKIPCCV_CLI(BaseCLI):

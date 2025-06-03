@@ -18,9 +18,9 @@ MultiLook = namedtuple("MultiLook", ["Num_Range_LOOKS", "Num_Azimuth_LOOKS",
                        "Estimated_RangeResolution", "Estimated_AzimuthResolution"])
 
 
-class SARResolutions:
-    RRES = None  # RANGE RESOLUTION
-    ARES = None  # AZIMUTH RESOLUTION
+class SARResolutions(ABC):
+    RRES = ...  # RANGE RESOLUTION
+    ARES = ...  # AZIMUTH RESOLUTION
 
 
 class S1_IW_SLC(SARResolutions):
@@ -29,13 +29,13 @@ class S1_IW_SLC(SARResolutions):
 
 
 class CSK_HIMAGE_SLC(SARResolutions):
-    RRES = 3.0  # RANGE RESOLUTION
-    ARES = 3.0  # AZIMUTH RESOLUTION
+    RRES = 3.0  # RANGE RESOLUTION (AFAIK)
+    ARES = 3.0  # AZIMUTH RESOLUTION (AFAIK)
 
 
 class CSG_HIMAGE_SLC(SARResolutions):
-    RRES = 2.6488857702529085  # RANGE RESOLUTION
-    ARES = 2.6488857702529085  # AZIMUTH RESOLUTION
+    RRES = 2.6488857702529085  # RANGE RESOLUTION (AFAIK)
+    ARES = 2.6488857702529085  # AZIMUTH RESOLUTION (AFAIK)
 
 
 @unique

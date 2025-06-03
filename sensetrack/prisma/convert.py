@@ -1,3 +1,35 @@
+"""
+convert.py
+This module provides utilities for handling PRISMA satellite data files,
+specifically for extracting metadata and converting data cubes to
+GeoTIFF format.
+
+Functions:
+
+    - get_prisma_info(prisma_file): Prints selected metadata attributes
+    from a PRISMA HDF5 file.
+    - prisma_panchromatic_to_gtiff(prisma_file, band='swir'): Converts
+    a specified band ('pan', 'swir', or 'vnir') from a PRISMA HDF5 file
+    to a GeoTIFF file, preserving georeferencing information.
+
+Command-line interface:
+
+    - Use the '-i' or '--show_info' flag to display metadata information
+    from a PRISMA file.
+    - Use the '-c' or '--convert' flag to convert a PRISMA file to GeoTIFF
+    format.
+    - Use the '-f' or '--file' option to specify the input PRISMA file.
+
+Dependencies:
+
+    - h5py
+    - numpy
+    - rasterio
+
+Note:
+
+    This script is intended for use with PRISMA satellite data products in HDF5 format.
+"""
 from argparse import ArgumentParser
 from pathlib import Path
 
@@ -11,10 +43,13 @@ gtif_dir = "gtif"
 
 def _get_parser():
     parser = ArgumentParser()
-    parser.add_argument('-i', '--show_info', action='store_true', default=False, help='mostra alcune informazioni')
-    parser.add_argument('-c', '--convert', action='store_true', default=True, help='converte in geotiff')
-    # parser.add_argument('-w', '--folder', action='store_true', default=False, help = 'converte in geotiff tutti i file in una cartella')
-    parser.add_argument('-f', '--file', help = 'file prisma')
+    parser.add_argument('-i', '--show_info', action='store_true',
+                        default=False, help='mostra alcune informazioni')
+    parser.add_argument('-c', '--convert', action='store_true',
+                        default=True, help='converte in geotiff')
+    parser.add_argument('-d', '--datacube', default='pan', type=str,
+                        help='Dataset da esportare (opzioni possibili: `pan`, `swir` e `vnir`)')
+    parser.add_argument('-f', '--file', help='file prisma')
 
     return parser
 
@@ -34,23 +69,27 @@ def get_prisma_info(prisma_file: str | Path):
             print(f"{key}: {src.attrs[key]}")
 
 
-
-def prisma_panchromatic_to_gtiff(prisma_file: str | Path, band='swir'):
+def prisma_panchromatic_to_gtiff(prisma_file: str | Path, datacube='swir'):
     prisma_file = Path(prisma_file)
 
-    valid_bands = ['pan', 'swir', 'vnir']
-    if band not in valid_bands:
-        raise ValueError(f"Invalid band '{band}'. Valid options are {valid_bands}.")
+    valid_cubes = ['pan', 'swir', 'vnir']
+    if datacube not in valid_cubes:
+        raise ValueError(
+            f"Invalid band '{datacube}'. Valid options are {valid_cubes}.")
 
     with h5py.File(prisma_file) as src:
         epsg = src.attrs["Epsg_Code"]
 
-        west = min(src.attrs["Product_LLcorner_easting"], src.attrs["Product_ULcorner_easting"])
-        south = min(src.attrs["Product_LLcorner_northing"], src.attrs["Product_LRcorner_northing"])
-        east = max(src.attrs["Product_LRcorner_easting"], src.attrs["Product_URcorner_easting"])
-        north = max(src.attrs["Product_ULcorner_northing"], src.attrs["Product_URcorner_northing"])
+        west = min(src.attrs["Product_LLcorner_easting"],
+                   src.attrs["Product_ULcorner_easting"])
+        south = min(src.attrs["Product_LLcorner_northing"],
+                    src.attrs["Product_LRcorner_northing"])
+        east = max(src.attrs["Product_LRcorner_easting"],
+                   src.attrs["Product_URcorner_easting"])
+        north = max(src.attrs["Product_ULcorner_northing"],
+                    src.attrs["Product_URcorner_northing"])
 
-        match band:
+        match datacube:
             case 'pan':
                 array = src["HDFEOS/SWATHS/PRS_L2D_PCO/Data Fields/Cube"][()]
             case 'swir':
@@ -58,14 +97,13 @@ def prisma_panchromatic_to_gtiff(prisma_file: str | Path, band='swir'):
             case 'vnir':
                 array = src["HDFEOS/SWATHS/PRS_L2D_HCO/Data Fields/VNIR_Cube"][()]
 
-
     if array.ndim < 3:
         array = array[np.newaxis, :, :]
 
     count, height, width = array.shape
 
     profile = {
-        "fp": prisma_file.parent / (prisma_file.stem + f"_{band}.tif"),
+        "fp": prisma_file.parent / (prisma_file.stem + f"_{datacube}.tif"),
         "mode": "w",
         "driver": "GTiff",
         "width": width,
@@ -86,7 +124,7 @@ if __name__ == "__main__":
     parms = _get_parser().parse_args()
 
     if parms.convert:
-        prisma_panchromatic_to_gtiff(parms.file)
+        prisma_panchromatic_to_gtiff(parms.file, datacube = parms.datacube)
 
-    if parms.show_info:
+    elif parms.show_info:
         get_prisma_info(parms.file)

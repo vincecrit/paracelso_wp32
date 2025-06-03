@@ -1,3 +1,41 @@
+"""
+cli.py
+This module provides a command-line interface (CLI) for the Offset-Tracking (OT) component of the sensetrack package.
+It allows users to perform offset-tracking between two input images (reference and target) with configurable preprocessing
+and output options.
+
+Classes:
+
+    BaseCLI: Base class for building CLI applications for offset-tracking algorithms. Handles argument parsing, image loading,
+             preprocessing, algorithm execution, and output writing.
+
+Arguments:
+
+    -r, --reference     Path to the reference image (required).
+    -t, --target        Path to the target image (required).
+    -o, --output        Path to the output file (default: "output.tif").
+    -b, --band          Band index to process (optional).
+    --nodata            Value to use for nodata pixels (optional).
+    -prep, --preprocessing  Preprocessing method to apply (default: "equalize").
+
+Dependencies:
+
+    - argparse
+    - pathlib.Path
+    - sensetrack.log
+    - sensetrack.ot.lib
+    - sensetrack.ot.helpmsg
+    - sensetrack.ot.image_processing.dispatcher
+    - sensetrack.ot.interfaces.OTAlgorithm
+
+Typical workflow:
+
+    1. Parse command-line arguments.
+    2. Load reference and target images.
+    3. Apply preprocessing.
+    4. Run the selected offset-tracking algorithm.
+    5. Export the displacement results to the specified output file.
+"""
 import argparse
 from pathlib import Path
 

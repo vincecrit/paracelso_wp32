@@ -1,3 +1,39 @@
+'''
+sensetrack.cosmo.lib
+
+This module provides classes and utilities for handling COSMO-SkyMed (CSK, 1st generation) and COSMO Second Generation (CSG, 2nd generation) satellite product metadata and files. It includes enumerations for product attributes, parsing utilities for product filenames, and wrappers for HDF5 product files.
+
+Classes:
+
+    - Polarization: Enum representing SAR polarization modes.
+    - Orbit: Enum for orbit direction (Ascending/Descending).
+    - CosmoProduct: Enum for COSMO product generations.
+    - Squint: Enum for squint angle types.
+    - Product: Base class for COSMO products, with mission and attribute mappings.
+    - CSKInfo: Named tuple for CSK product metadata.
+    - CSGInfo: Named tuple for CSG product metadata.
+    - CSKProduct: Parser and metadata handler for CSK filenames.
+    - CSGProduct: Parser and metadata handler for CSG filenames.
+    - CSKFile: HDF5 file wrapper for CSK products, providing convenient access to image data and geolocation attributes.
+    - Pols: Dictionary subclass for handling polarization data.
+
+Functions:
+
+    - CSKProduct.parse_filename(filename): Parses a CSK filename and returns a CSKInfo named tuple.
+    - CSGProduct.parse_filename(filename): Parses a CSG filename and returns a CSGInfo named tuple.
+
+Dependencies:
+
+    - h5py: For reading HDF5 product files.
+    - numpy: For array operations.
+    - shapely: For geometric operations (footprint polygons).
+    - PIL.Image: For image conversion.
+    - sensetrack.cosmo.utils: Utility functions for string chopping and date parsing.
+
+Usage:
+
+This module is intended for internal use within the sensetrack.cosmo package to facilitate the reading, parsing, and interpretation of COSMO-SkyMed product files and their metadata.
+'''
 
 from collections import namedtuple
 from enum import Enum, unique

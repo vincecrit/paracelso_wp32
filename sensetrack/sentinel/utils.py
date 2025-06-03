@@ -1,3 +1,28 @@
+"""
+utils.py
+Utility functions for processing Sentinel SAR data.
+This module provides helper functions for extracting orbit properties and calculating
+mean incidence angles from Sentinel SAR product archives (SAFE format, typically zipped).
+
+It includes:
+
+- `reformat_node_time`: Reformatting ISO8601 node time strings to a compact format.
+- `read_orbit_properties`: Extracting orbit pass, node time, and relative orbit number from a zipped SAFE product.
+- `s1_mean_incidence_angle_rad`: Computing the mean incidence angle (in radians) for a given polarization from annotation XML files inside a zipped SAFE product.
+
+Dependencies:
+
+    - math
+    - zipfile
+    - collections.namedtuple
+    - datetime
+    - pathlib.Path
+    - bs4.BeautifulSoup
+    
+Typical usage example:
+    props = read_orbit_properties("path/to/S1_product.zip")
+    mean_angle = s1_mean_incidence_angle_rad("path/to/S1_product.zip", polarization="vv")
+"""
 import math
 import zipfile
 from collections import namedtuple
