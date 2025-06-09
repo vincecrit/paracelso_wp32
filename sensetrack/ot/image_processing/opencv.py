@@ -1,7 +1,11 @@
+"""
+This module provides OpenCV-based image processing operations including histogram equalization,
+normalization, and denoising methods.
+"""
 import cv2
 import numpy as np
 
-from log import setup_logger
+from sensetrack.log import setup_logger
 from sensetrack.ot.image_processing import common
 
 logger = setup_logger(__name__)
@@ -21,15 +25,25 @@ def clahe(*, array: np.ndarray,
           clip_limit: float = .05,
           kernel_size: int | tuple[int] = 3) -> np.ndarray:
     """
-    Contrast limited adaptive histogram equalization
+    Apply Contrast Limited Adaptive Histogram Equalization (CLAHE) to an image.
+
+    Args:
+        array (np.ndarray): Input image array
+        clip_limit (float): Threshold for contrast limiting. Default is 0.05
+        kernel_size (int | tuple[int]): Size of grid for histogram equalization.
+            If int, same value is used for both dimensions.
+            If tuple, specifies (width, height). Default is 3
+
+    Returns:
+        np.ndarray: CLAHE enhanced image
     """
-    logger.info("Eseguo CLAHE con metodi OpenCV")
+    logger.info("Applying CLAHE using OpenCV methods")
     array = common.to_single_band_uint8(array)
 
     if isinstance(kernel_size, int):
         kernel_size = kernel_size, kernel_size
 
-    logger.debug(f"CLAHE finestra mobile: {kernel_size=}")
+    logger.debug(f"CLAHE sliding window: {kernel_size=}")
 
     clahe = cv2.createCLAHE(clipLimit=clip_limit, tileGridSize=kernel_size)
     return clahe.apply(array)
@@ -38,9 +52,18 @@ def clahe(*, array: np.ndarray,
 @common._tofromimage
 def equalize(*, array):
     """
-    Basic histogram equalization.
+    Apply basic histogram equalization to an image.
+
+    This function enhances the contrast of the image by effectively
+    spreading out the most frequent intensity values.
+
+    Args:
+        array: Input image array
+
+    Returns:
+        np.ndarray: Histogram equalized image
     """
-    logger.info("Eseguo cv2.equalizeHist")
+    logger.info("Applying cv2.equalizeHist")
     array = common.to_single_band_uint8(array=array)
     array = cv2.equalizeHist(array)
     return array
@@ -50,15 +73,25 @@ def equalize(*, array):
 def lognorm(*, array: np.ndarray,
             gain: float = 1.):
     """
-    Normalize a band using logarithmic transformation.
+    Apply logarithmic normalization to an image.
+
+    This transformation enhances details in darker regions while compressing
+    the dynamic range of brighter regions.
+
+    Args:
+        array (np.ndarray): Input image array
+        gain (float): Multiplication factor for the log transform. Default is 1.0
+
+    Returns:
+        np.ndarray: Log-normalized image
     """
-    logger.info("Eseguo trasformazione logaritmica con metodi OpenCV")
+    logger.info("Applying logarithmic transformation using OpenCV methods")
     common._array_verbose(array)
 
     array = common.to_single_band_uint8(array, nodata=-9999.)
 
     logger.debug(
-        f"Converto il formato in ingresso in `CV_32F` prima della trasformazione logaritmica")
+        f"Converting input format to `CV_32F` before logarithmic transformation")
     array = common._normalize(array, 0, 1, dtype=cv2.CV_32F)
 
     normalized = gain * np.log(1. + array)
@@ -68,7 +101,19 @@ def lognorm(*, array: np.ndarray,
 
 @common._tofromimage
 def zscore(*, array):
-    logger.info("Applico la trasformata zscore con metodi OpenCV")
+    """
+    Apply Z-score normalization to an image.
+
+    Normalizes the image by subtracting the mean and dividing by the standard deviation,
+    resulting in a distribution with zero mean and unit variance.
+
+    Args:
+        array: Input image array
+
+    Returns:
+        np.ndarray: Z-score normalized image
+    """
+    logger.info("Applying zscore transform using OpenCV methods")
     array = common.to_single_band_uint8(array)
     common._array_verbose(array)
 
@@ -80,7 +125,18 @@ def zscore(*, array):
 
 @common._tofromimage
 def minmax(*, array):
-    logger.info("Scalo le intensità sui valori minimo/massimo con metodi OpenCV")
+    """
+    Apply min-max scaling to an image.
+
+    Scales the image values to the full range of the 8-bit unsigned integer format (0-255).
+
+    Args:
+        array: Input image array
+
+    Returns:
+        np.ndarray: Min-max scaled image
+    """
+    logger.info("Scaling intensities to min/max values using OpenCV methods")
     common._array_verbose(array)
 
     return common.to_single_band_uint8(array)
@@ -89,20 +145,25 @@ def minmax(*, array):
 @common._tofromimage
 def svd_denoise(array: np.ndarray, patch_size: int | None = None, stride: int| None = None, k=3) -> np.ndarray:
     """
-    Applica la Singolar Value Decomposition su finestra mobile ad un'immagine.
-    
+    Apply Singular Value Decomposition (SVD) based denoising using a sliding window.
+
+    This method performs denoising by applying SVD to local patches of the image
+    and reconstructing them using only the k most significant singular values.
+
     Args:
-        array(numpy.ndarray): array
-        patch_size(int): passo della finestra mobile
-        stride(int): distanza tra le finestre (sovrapposizione = patch_size - stride)
-        k(int): numero di valori di singoli da considerare (default = 10)
+        array (np.ndarray): Input image array
+        patch_size (int, optional): Size of the sliding window. If None, automatically calculated
+            based on image dimensions
+        stride (int, optional): Distance between windows (overlap = patch_size - stride).
+            If None, set to half the patch size
+        k (int): Number of singular values to keep for reconstruction. Default is 3
 
     Returns:
-        reconstructed(numpy.ndarray): array ricostruito con k valori singoli
+        np.ndarray: Denoised image array
     """
     array = common.to_single_band_uint8(array, nodata=-9999.)
     
-    logger.info("Applico denoise con SVD")
+    logger.info("Applying SVD denoising")
     if patch_size is None:
         raxis = min(array.shape) # reference axis
         n = float(10**(np.floor(np.log10(raxis))-1))
@@ -121,21 +182,21 @@ def svd_denoise(array: np.ndarray, patch_size: int | None = None, stride: int| N
         ((0, pad_r), (0, pad_c)),
         mode='reflect')
     
-    # Copia vuota per l'immagine ricostruita
+    # Empty copy for reconstructed image
     reconstructed = np.zeros_like(padded_array)
     count_matrix = np.zeros_like(padded_array)
 
-    # Loop sulle finestre
+    # Loop over windows
     for i in range(0, padded_array.shape[0] - patch_size + 1, stride):
         for j in range(0, padded_array.shape[1] - patch_size + 1, stride):
 
             patch = padded_array[i:i+patch_size, j:j+patch_size]
             patch_reconstructed = common.svd_filter(patch, k)
 
-            # Inserisci la patch ricostruita nella nuova immagine (media nei punti sovrapposti)
+            # Insert reconstructed patch into new image (average in overlapping points)
             reconstructed[i:i+patch_size, j:j+patch_size] += patch_reconstructed
             count_matrix[i:i+patch_size, j:j+patch_size] += 1
 
-    # Normalizza i pixel nelle aree sovrapposte
+    # Normalize pixels in overlapping areas
     reconstructed =  (reconstructed / count_matrix)[:array.shape[0], :array.shape[1]]
     return common._normalize(reconstructed, 0, 255, cv2.NORM_MINMAX, cv2.CV_8U)

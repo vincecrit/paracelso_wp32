@@ -39,7 +39,7 @@ import subprocess as sp
 from pathlib import Path
 
 from sensetrack.log import setup_logger
-from sensetrack.sentinel.utils import read_orbit_properties
+from sensetrack.sentinel.lib import BadZipFile, S1ManifestParser
 from sensetrack.snap_gpt.lib import (S1_IW_SLC, GPTSubsetter, SARPreprocessing,
                                      SARPreprocessor)
 
@@ -47,109 +47,109 @@ logger = setup_logger(__name__)
 
 
 class S1Preprocessor(SARPreprocessor):
+    """
+    Preprocessor for Sentinel-1 SAR data using SNAP GPT.
+    
+    This class extends SARPreprocessor to implement specific preprocessing workflows
+    for Sentinel-1 data, including multilook estimation, orbit property extraction,
+    and SNAP GPT graph execution.
+    """
     def __init__(self, SUBSET: GPTSubsetter, PROCESS: SARPreprocessing) -> None:
         super().__init__(SUBSET, PROCESS)
 
-    def run(self, SARFILE: str | Path, CRS: str = "EPSG:32632") -> None:
+    def run(self, S1FILE: str | Path, CRS: str = "EPSG:32632") -> None:
+        """
+        Execute the preprocessing workflow on a Sentinel-1 SAR file.
 
-        ml = self.estimate_multilook_parms(SARFILE, S1_IW_SLC(), 1)
-        # res = int(min(ml.Estimated_AzimuthResolution, ml.Estimated_RangeResolution))
-        logger.debug(f"Parametri MultiLook e risoluzione finale: {ml}")
-        SARFILE = Path(SARFILE)
+        Args:
+            SARFILE (str | Path): Path to input Sentinel-1 SAR file
+            CRS (str, optional): Target coordinate reference system. Defaults to "EPSG:32632"
 
-        if not SARFILE.suffix == '.zip':
-            raise ValueError("SAR file must be a zip archive")
+        Raises:
+            ValueError: If the input file is not a zip archive
+        """
+        info = S1ManifestParser.s1slc_orbit_properties(S1FILE)
+        ml = self.estimate_multilook_parms(S1FILE, S1_IW_SLC(), 1)
+        logger.debug(f"Multilook parameters and final resolution: {ml}")
 
-        orbit_properties = read_orbit_properties(SARFILE)
-
-        ORBIT_TAG = orbit_properties.ORBIT_PASS[0]
+        ORBIT_TAG = info.ORBIT_PASS[0]
 
         OUTPUT_FILE = f'{ORBIT_TAG}_' +\
             f'{self.SUBSET.name}_' +\
-            f'{self._PROCESS}_' +\
-            f'{orbit_properties.RELORBIT:>03}_' +\
-            f'{orbit_properties.NODE_TIME}.tif'
+            f'{info.RELORBIT:>03}_' +\
+            f'{info.NODE_TIME}_' +\
+            f'{self.PROCESS}.tif'
 
         sp.run(["gpt.exe",
                 self.GRAPH,
-                f'-Pinput={SARFILE}',
+                f'-Pinput={S1FILE}',
                 f'-PnRgLooks={ml.Num_Range_LOOKS}',
                 f'-PnAzLooks={ml.Num_Azimuth_LOOKS}',
                 f'-PgeoRegion={self.SUBSET.geometry.__str__()}',
-                f'-Poutput={str(SARFILE.parent / OUTPUT_FILE)}',
+                f'-Poutput={str(S1FILE.parent / OUTPUT_FILE)}',
                 f'-PmapProjection={CRS}'
                 ],
                shell=True)
 
+        return S1FILE.parent / OUTPUT_FILE
 
-def main(preprocessor, file, workflow, aoi):
 
-    import sys
+def main(file, graph_name, aoi):
+    """
+    Main entry point for SAR preprocessing execution.
 
-    __processes = list(SARPreprocessing._member_map_.keys())
+    This function validates inputs, sets up the preprocessing environment,
+    and executes the specified workflow.
 
-    assert workflow.upper() in __processes
+    Args:
+        file (str): Path to input SAR file
+        graph_name (str): Name of preprocessing workflow to apply
+        aoi (str): Path to area of interest file (shapefile or GeoPackage)
+
+    Returns:
+        None. Exits with status code:
+        - -1: If AOI file is invalid or not found
+        - 1: On successful completion
+        
+    Raises:
+    """
 
     try:
         SUBSET = GPTSubsetter.get_subset(aoi)
-
-    except (FileNotFoundError, ValueError) as err:
-        logger.error(f"Failed to get AOI: {err}")
-        exit(-1)
-
-    PROCESS = eval(f"SARPreprocessing.{sys.argv[2].upper()}")
-    SARFILE = Path(file)
-
-    if not SARFILE.is_file():
-        print(f"The file {SARFILE} does not exist.")
-        exit(-1)
-
-    else:
-        preprocessor(SUBSET, PROCESS).run(SARFILE)
+        preprocessor = S1Preprocessor(SUBSET, graph_name)
+        OUTPUT_FILEPATH = preprocessor.run(Path(file))
+        logger.info(f"S1 product {file} successfully converted in {OUTPUT_FILEPATH}")
         exit(1)
 
+    except FileNotFoundError as err:
+        logger.error(f"File not found: {err}")
+        exit(0)
+    except ValueError as err:
+        logger.error(f"Value error: {err}")
+        exit(0)
+    except BadZipFile as err:
+        logger.error(f"BadZipFile error: {err}")
+        exit(0)
+    except Exception as err:
+        logger.error(f"Unexpected error: {err}")
+        exit(0)
 
 
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description=main.__doc__)
+
     parser.add_argument("--file", required=True,
-                        help="Percorso al file da elaborare", type=str)
-    parser.add_argument("--workflow", required=True,
-                        help="Workflow da utilizzare per il processamento",
+                        help="Path to the SAR file to process",
+                        type=str)
+    parser.add_argument("--graph_name", required=True,
+                        help="Preprocessing workflow to apply",
                         type=str)
     parser.add_argument("--aoi", required=True,
-                        help="Area di interesse (ESRI Shapefile o GeoPackage)",
+                        help="Area of interest (ESRI Shapefile or GeoPackage)",
                         type=str)
 
-    args = vars(parser.parse_args())
+    kwargs = vars(parser.parse_args())
 
-    main(S1Preprocessor, **args)
-
-
-# if __name__ == "__main__":
-
-#     import sys
-
-#     __processes = list(SARPreprocessing._member_map_.keys())
-
-#     assert sys.argv[2].upper() in __processes
-
-#     try:
-#         SUBSET = GPTSubsetter.get_subset(sys.argv[1])
-
-#     except (FileNotFoundError, ValueError) as err:
-#         logger.error(f"Failed to get AOI: {err}")
-#         exit(-1)
-
-#     PROCESS = eval(f"SARPreprocessing.{sys.argv[2].upper()}")
-#     SARFILE = Path(sys.argv[3])
-
-#     if not SARFILE.is_file():
-#         print(f"The file {SARFILE} does not exist.")
-#         exit(-1)
-
-#     else:
-#         S1Preprocessor(SUBSET, PROCESS).run(SARFILE)
-#         exit(1)
+    main(**kwargs)
