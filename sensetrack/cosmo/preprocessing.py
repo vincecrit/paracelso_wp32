@@ -49,13 +49,33 @@ logger = setup_logger(__name__)
 
 
 class CSKPreprocessor(SARPreprocessor):
-    def __init__(self, SUBSET: GPTSubsetter, PROCESS: SARPreprocessing) -> None:
+    """
+    A preprocessor class for COSMO-SkyMed (CSK) SAR products.
+
+    This class extends the SARPreprocessor to handle CSK-specific preprocessing operations,
+    including multi-look estimation and SNAP GPT workflow execution.
+
+    Args:
+        SUBSET (GPTSubsetter): A subsetter object defining the area of interest.
+        PROCESS (SARPreprocessing): The processing workflow to be applied.
+    """
+
+    def __init__(self, SUBSET: GPTSubsetter, PROCESS: str) -> None:
         super().__init__(SUBSET, PROCESS)
 
     def run(self, CSKFILE: str | Path, CRS: str = "EPSG:32632") -> None:
+        """
+        Execute preprocessing workflow on a CSK SAR product.
+
+        Args:
+            CSKFILE (str | Path): Path to the CSK product file (.h5 format)
+            CRS (str, optional): Coordinate Reference System. Defaults to "EPSG:32632".
+
+        Raises:
+            ValueError: If the input file is not a valid CSK format (.h5)
+        """
 
         ml = self.estimate_multilook_parms(CSKFILE, CSK_HIMAGE_SLC(), 2)
-        # res = int(min(ml.Estimated_AzimuthResolution, ml.Estimated_RangeResolution))
         logger.debug(f"Parametri MultiLook e risoluzione finale: {ml}")
 
         CSKFILE = Path(CSKFILE)
@@ -63,9 +83,9 @@ class CSKPreprocessor(SARPreprocessor):
         if not CSKFILE.suffix == '.h5':
             raise ValueError("Is not a valid cosmo format")
 
-        csk_info = lib.CSKProduct.parse_filename(CSKFILE.stem)
+        info = lib.CosmoFilenameParser.create_from_filename(CSKFILE.stem)
 
-        OUTPUT_FILE = csk_info.OrbitDirection[0] + "_" +\
+        OUTPUT_FILE = info.OrbitDirection[0] + "_" +\
             self.SUBSET.name + "_" +\
             CSKFILE.stem + ".tif"
 
@@ -81,92 +101,105 @@ class CSKPreprocessor(SARPreprocessor):
                shell=True)
 
 
-class CSGPreprocessor(SARPreprocessor):
-    def __init__(self, SUBSET: GPTSubsetter, PROCESS: SARPreprocessing) -> None:
+class CosmoPreprocessor(SARPreprocessor):
+    """
+    A preprocessor class for COSMO-Skymed (CSG & CSK) SAR products.
+
+    This class extends the SARPreprocessor to handle Cosmo-specific preprocessing operations,
+    including multi-look estimation and SNAP GPT workflow execution.
+
+    Args:
+        SUBSET (GPTSubsetter): A subsetter object defining the area of interest.
+        PROCESS (SARPreprocessing): The processing workflow to be applied.
+    """
+    def __init__(self, SUBSET: GPTSubsetter, PROCESS: str) -> None:
         super().__init__(SUBSET, PROCESS)
 
-    def run(self, CSGFILE: str | Path, CRS: str = "EPSG:32632") -> None:
+    def run(self, COSMOFILE: str | Path, CRS: str = "EPSG:32632") -> None:
+        """
+        Execute preprocessing workflow on a CSG SAR product.
 
-        ml = self.estimate_multilook_parms(CSGFILE, CSG_HIMAGE_SLC(), 2)
-        # res = int(min(ml.Estimated_AzimuthResolution, ml.Estimated_RangeResolution))
-        logger.debug(f"Parametri MultiLook e risoluzione finale: {ml}")
+        Args:
+            CSGFILE (str | Path): Path to the CSG product file (.h5 format)
+            CRS (str, optional): Coordinate Reference System. Defaults to "EPSG:32632".
 
-        CSGFILE = Path(CSGFILE)
+        Raises:
+            ValueError: If the input file is not a valid CSG format (.h5)
+        """
 
-        if not CSGFILE.suffix == '.h5':
-            raise ValueError("Is not a valid cosmo format")
+        info = lib.CosmoFilenameParser.create_from_filename(COSMOFILE.stem)
 
-        csk_info = lib.CSGProduct.parse_filename(CSGFILE.stem)
+        if info.Mission == "CSG":
+            ml = self.estimate_multilook_parms(COSMOFILE, CSG_HIMAGE_SLC(), 2)
 
-        OUTPUT_FILE = csk_info.OrbitDirection[0] + "_" +\
+        elif info.Mission == "CSK":
+            ml = self.estimate_multilook_parms(COSMOFILE, CSK_HIMAGE_SLC(), 2)
+
+        logger.debug(f"MultiLook parameters and final resolution: {ml}")
+
+        COSMOFILE = Path(COSMOFILE)
+
+        OUTPUT_FILE = info.OrbitDirection[0] + "_" +\
             self.SUBSET.name + "_" +\
-            CSGFILE.stem + ".tif"
+            COSMOFILE.stem + ".tif"
 
         sp.run(["gpt.exe",
                 self.GRAPH,
-                f'-Pinput='+str(CSGFILE),
+                f'-Pinput='+str(COSMOFILE),
                 f'-PnRgLooks={ml.Num_Range_LOOKS}',
                 f'-PnAzLooks={ml.Num_Azimuth_LOOKS}',
                 f'-PmapProjection={CRS}',
                 f'-PgeoRegion={self.SUBSET.geometry.__str__()}',
-                f'-Poutput={str(CSGFILE.parent / OUTPUT_FILE)}'
+                f'-Poutput={str(COSMOFILE.parent / OUTPUT_FILE)}'
                 ],
                shell=True)
 
+        return COSMOFILE.parent / OUTPUT_FILE
 
-def main(preprocessor, file, workflow, aoi):
 
-    import sys
+def main(file, graph_name, aoi):
+    """
+    Main entry point for preprocessing COSMO-SkyMed and COSMO Second Generation
+    SAR products.
 
-    __processes = list(SARPreprocessing._member_map_.keys())
+    Args:
+        file (str): Path to the input SAR product file
+        graph_name (str): Name of the processing graph to apply
+        aoi (str): Path to the Area of Interest file (ESRI Shapefile or GeoPackage)
 
-    assert workflow.upper() in __processes
+    Raises:
+        FileNotFoundError: If any of the required files do not exist.
+        ValueError: If filename has either a wrong extention or is not compliant
+        with Cosmo-Skymed naming convention.
+    """
 
     try:
         SUBSET = GPTSubsetter.get_subset(aoi)
-
-    except (FileNotFoundError, ValueError) as err:
-        logger.error(f"Failed to get AOI: {err}")
-        exit(-1)
-
-    PROCESS = eval(f"SARPreprocessing.{sys.argv[2].upper()}")
-    SARFILE = Path(file)
-
-    if not SARFILE.is_file():
-        print(f"The file {SARFILE} does not exist.")
-        exit(-1)
-
-    else:
-        preprocessor(SUBSET, PROCESS).run(SARFILE)
+        preprocessor = CosmoPreprocessor(SUBSET, graph_name)
+        OUTPUT_FILEPATH = preprocessor.run(Path(file))
+        logger.info(f"Cosmo product {file} successfully converted in {OUTPUT_FILEPATH}")
         exit(1)
 
+    except (FileNotFoundError, ValueError) as err:
+        logger.error(err)
+        exit(0)
 
 
 if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--product_type", required=True,
-                        help="Prodotto CSK o CSG", type=str)
+
     parser.add_argument("--file", required=True,
-                        help="Percorso al file da elaborare", type=str)
-    parser.add_argument("--workflow", required=True,
-                        help="Workflow da utilizzare per il processamento",
+                        help="Cosmo-Skymed product file path",
+                        type=str)
+    parser.add_argument("--graph_name", required=True,
+                        help="Processing graph to be used",
                         type=str)
     parser.add_argument("--aoi", required=True,
-                        help="Area di interesse (ESRI Shapefile o GeoPackage)",
+                        help="Area Of Interest (ESRI Shapefile or GeoPackage)",
                         type=str)
 
-    args = vars(parser.parse_args())
+    kwargs = vars(parser.parse_args())
 
-    if args['product_type'].upper() == "CSK":
-        preprocessor = CSKPreprocessor
-
-    elif args['product_type'].upper() == "CSG":
-        preprocessor = CSGPreprocessor
-    
-    else:
-        print("Definire un prodotto Cosmo-Skymed (CSK o CSG)")
-        exit(-1)
-
-    main(preprocessor, **args)
+    main(**kwargs)

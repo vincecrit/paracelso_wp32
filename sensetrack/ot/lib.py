@@ -2,33 +2,7 @@
 This module provides utility functions for managing raster images and geospatial vector data,
 with a focus on loading, saving, coregistration, and conversion between different formats
 using the `rasterio`, `geopandas`, and `opencv` libraries.
-Main Features:
---------------
-- Load raster images from files, with support for band selection.
-- Convert and save `Image` objects to geospatial raster formats.
-- Convert and save `GeoDataFrame` objects to vector formats (GPKG, SHP).
-- Coregister raster images (alignment and reprojection relative to a reference image).
-- Check for georeferencing and handle special cases.
-- Detailed logging of operations and errors via a custom logger.
-Classes and Functions:
-----------------------
-- `rasterio_open`: Loads raster images using rasterio, with optional band selection.
-- `image_to_rasterio`: Saves an `Image` object to a raster file using rasterio.
-- `geopandas_to_ogr`: Saves a `GeoDataFrame` to a vector file (GPKG, SHP).
-- `write_output`: Writes either raster or vector data to the appropriate file format.
-- `load_images`: Loads a pair of images as `ot.interfaces.Image` objects, checks georeferencing, and performs coregistration if needed.
-- `basic_pixel_coregistration`: Aligns and reprojects a target image to match a reference image.
-- Helper functions for type checking and affine transformation validation.
-Dependencies:
--------------
-- rasterio
-- geopandas
-- opencv (cv2)
-- numpy
-- sensetrack.log (for logging)
-- sensetrack.ot.interfaces (for the Image class)
 """
-
 import logging
 from pathlib import Path
 
@@ -48,11 +22,30 @@ logger = setup_logger(__name__)
 
 
 def _to_bandlast(arr):
-    '''[BAND, ROW, COL] -> [ROW, COL, BAND]'''
+    """
+    Convert array from [BAND, ROW, COL] format to [ROW, COL, BAND] format.
+    
+    Args:
+        arr: Input array in [BAND, ROW, COL] format
+        
+    Returns:
+        np.ndarray: Array in [ROW, COL, BAND] format
+    """
     return np.transpose(arr, (1, 2, 0))
 
 
 def __debug_attrerr(func, *args, **kwargs):
+    """
+    Decorator to handle AttributeError exceptions with logging.
+    
+    Args:
+        func: Function to wrap
+        *args: Positional arguments
+        **kwargs: Keyword arguments
+        
+    Returns:
+        callable: Wrapped function that handles AttributeError
+    """
     def inner(*args, **kwargs):
         try:
             result = func(*args, **kwargs)
@@ -64,14 +57,41 @@ def __debug_attrerr(func, *args, **kwargs):
 
 
 def is_image(arg) -> bool:
+    """
+    Check if argument is an Image instance.
+    
+    Args:
+        arg: Object to check
+        
+    Returns:
+        bool: True if arg is an Image instance, False otherwise
+    """
     return isinstance(arg, Image)
 
 
 def is_geodf(arg) -> bool:
+    """
+    Check if argument is a GeoDataFrame instance.
+    
+    Args:
+        arg: Object to check
+        
+    Returns:
+        bool: True if arg is a GeoDataFrame instance, False otherwise
+    """
     return isinstance(arg, gpd.GeoDataFrame)
 
 
 def is_identity_affine(affine: rasterio.Affine) -> bool:
+    """
+    Check if affine transform is an identity matrix.
+    
+    Args:
+        affine (rasterio.Affine): Affine transformation matrix to check
+        
+    Returns:
+        bool: True if the affine transform is an identity matrix, False otherwise
+    """
     matrix = np.array(affine).reshape(3, 3)
     if (np.diagonal(matrix) == 1).all():
         return True
@@ -80,7 +100,21 @@ def is_identity_affine(affine: rasterio.Affine) -> bool:
 
 
 def rasterio_open(source: str, band: int | None = None) -> tuple:
-    logger.debug(f"Caricamento {source} con rasterio.")
+    """
+    Open a raster file using rasterio and convert to OpenCV format.
+    
+    Args:
+        source (str): Path to the raster file
+        band (int | None): Specific band to read. If None, reads up to first 3 bands
+        
+    Returns:
+        tuple: (dataset, affine_transform, crs) where dataset is in OpenCV format
+        
+    Raises:
+        ValueError: If requested band index is out of range
+        RasterioIOError: If file cannot be opened
+    """
+    logger.debug(f"Loading {source} with rasterio.")
 
     try:
         with rasterio.open(source) as src:
@@ -108,10 +142,19 @@ def rasterio_open(source: str, band: int | None = None) -> tuple:
 
 
 def image_to_rasterio(img: Image, outfile) -> None:
-
+    """
+    Save an Image object to a raster file using rasterio.
+    
+    Args:
+        img (Image): Image object to save
+        outfile: Path to output file
+        
+    Raises:
+        ValueError: If img is not an Image instance
+        Various rasterio errors if file cannot be written
+    """
     if not is_image(img):
-        raise ValueError("Tipo di argomento non corretto. " +
-                         f"Atteso `{type(Image)}`, ricevuto `{type(img)}`")
+        raise ValueError(f"Invalid argument type. Expected {type(Image)}, got {type(img)}")
 
     driver = rasterio.drivers.driver_from_extension(outfile)
     try:
@@ -124,16 +167,33 @@ def image_to_rasterio(img: Image, outfile) -> None:
 
 
 def geopandas_to_ogr(frame, outfile) -> None:
-
+    """
+    Save a GeoDataFrame to a vector file format.
+    
+    Args:
+        frame: GeoDataFrame to save
+        outfile: Path to output file
+        
+    Raises:
+        ValueError: If frame is not a GeoDataFrame instance
+    """
     if not is_geodf(frame):
-        raise ValueError("Tipo di argomento non corretto. " +
-                         f"Atteso `{type(gpd.GeoDataFrame)}`, ricevuto `{type(frame)}`")
+        raise ValueError(f"Invalid argument type. Expected {type(gpd.GeoDataFrame)}, got {type(frame)}")
 
-    frame.to_file(outfile, layer="spostamenti")
+    frame.to_file(outfile, layer="displacements")
 
 
 def write_output(output, outfile: str | Path) -> None:
-
+    """
+    Write output to file in appropriate format based on file extension.
+    
+    Args:
+        output: Data to write (Image or GeoDataFrame)
+        outfile (str | Path): Path to output file
+        
+    Raises:
+        NotImplementedError: If file extension is not supported
+    """
     outfile = Path(outfile)
 
     match outfile.suffix:
@@ -158,82 +218,100 @@ def write_output(output, outfile: str | Path) -> None:
 
 def load_images(*args, nodata=None, **kwargs):
     """
-    Carica una coppia di immagini e resituisce una coppia di oggetti 
-    `ot.interfaces.Image`.
+    Load a pair of images and return them as Image objects.
 
-    Info:
-        Operazioni eseguite:
-        1. Controllo estensione dei file
-        2. Controllo georeferenziazione
-        3. Coregistrazione di immagini
-        4. Output (oggetti `ot.interfaces.Image`)
+    This function performs several steps:
+    1. File extension validation
+    2. Georeferencing check
+    3. Image coregistration
+    4. Output as Image objects
 
     Args:
-        *args(str): percorsi delle immagini di reference e target, in quest'ordine
+        *args (str): Paths to reference and target images, in that order
+        nodata: Value to use for nodata pixels
+        **kwargs: Additional arguments passed to rasterio_open
 
     Returns:
-        tuple(ot.interfaces.Image):
+        tuple[Image, Image]: Reference and target images as Image objects
+
+    Raises:
+        SystemExit: If images have different formats or inconsistent georeferencing
     """
-    #  [1] Creo oggetti Path
+    #  [1] Create Path objects
     reference_file, target_file = [Path(src) for src in args]
     logger.info(f"REFERENCE: {reference_file.name}")
     logger.info(f"TARGET: {target_file.name}")
 
-    # file con estensione diversa non sono accettati
+    # Files with different extensions are not accepted
     if not reference_file.suffix == target_file.suffix:
-        logger.critical("Le due immagini hanno formati diversi")
+        logger.critical("Images have different formats")
         logger.debug(f"{reference_file.suffix=}, {target_file.suffix=}")
         exit(0)
 
     else:
-        # carico qualsiasi tipo di file con rasterio (tanto legge tutto mwaahahah)
+        # Load any file type with rasterio
         reference = Image(
             *rasterio_open(reference_file, **kwargs), nodata=nodata)
         target = Image(*rasterio_open(target_file, **kwargs), nodata=nodata)
 
-        # [2] rasterio associa un oggetto Affine come matrice identità quando la
-        # georeferenziazione non è definita
+        # [2] rasterio assigns an identity Affine object when
+        # georeferencing is not defined
         are_identity_affines = [
             is_identity_affine(e.affine) for e in (reference, target)
         ]
 
-        # Se nessuno dei file è georiferito non dovrebbero esserci problemi (credo)
+        # If neither file is georeferenced, should be fine
         if all(are_identity_affines):
-            logger.warning("Nessuno dei due file possiede una georeferenziazione. " +
-                           "La coregistrazione si limiterà ad allinerare/scalare i pixel " +
-                           "dell'immagine target")
+            logger.warning("Neither file has georeferencing. " +
+                           "Coregistration will be limited to aligning/scaling target image pixels")
             pass
 
-        # Se la georeferenziazione è definita solo per uno dei due file, non
-        # so che fare... Quindi lo butto fuori.
+        # If georeferencing is defined for only one file,
+        # we don't know what to do... so exit
         elif any(are_identity_affines):
             logger.critical(
-                "Uno dei due file non possiede la georeferenziazione.")
+                "One of the files lacks georeferencing.")
             logger.debug(f"{is_identity_affine(reference.affine)=}")
             logger.debug(f"{is_identity_affine(target.affine)=}")
             exit(0)
 
-        # [3] Coregistrazione delle immagini
+        # [3] Image coregistration
         else:
             if not reference.is_coregistered(target):
-                logger.info("Eseguo coregistrazione tra immagini raster")
+                logger.info("Performing raster image coregistration")
                 target_coreg = basic_pixel_coregistration(str(target_file),
                                                           str(reference_file))
-                logger.info(f"Coregistrazione eseguita correttamente" +
-                            f"File coregistrato: {target_coreg}")
+                logger.info(f"Coregistration completed successfully. " +
+                            f"Coregistered file: {target_coreg}")
                 target = Image(*rasterio_open(target_coreg, **kwargs))
             else:
-                # non succede mai in realtà
-                logger.info("Immagini raster già coregistrate.")
+                # This never actually happens
+                logger.info("Raster images already coregistered.")
 
         return reference, target
 
 
 def basic_pixel_coregistration(infile: str, match: str,
                                outfile: str | None = None) -> Path:
-    """Align pixels between a target image (infile) and a reference image (match).
-    Optionally, reproject to the same CRS as 'match'."""
-
+    """
+    Align pixels between a target image and a reference image.
+    
+    This function performs pixel-level alignment and optionally reprojects 
+    to the same CRS as the reference image.
+    
+    Args:
+        infile (str): Path to target image to be aligned
+        match (str): Path to reference image
+        outfile (str | None): Path for output file. If None, appends '_coreg' to input filename
+        
+    Returns:
+        Path: Path to coregistered output file
+        
+    The function:
+    1. Calculates output affine transform
+    2. Sets up output metadata
+    3. Reprojects each band using bilinear resampling
+    """
     if outfile is None:
         out_stem = Path(infile).stem + "_coreg" + Path(infile).suffix
         outfile = Path(infile).parent / out_stem
@@ -245,7 +323,7 @@ def basic_pixel_coregistration(infile: str, match: str,
         with rasterio.open(match) as match:
             dst_crs = match.crs
 
-            # calcolo trasformazione affine di output
+            # Calculate output affine transform
             dst_transform, dst_width, dst_height = calculate_default_transform(
                 src.crs,
                 dst_crs,
@@ -254,7 +332,7 @@ def basic_pixel_coregistration(infile: str, match: str,
                 *match.bounds,  # (left, bottom, right, top)
             )
 
-        # imposta metadati per output
+        # Set output metadata
         dst_kwargs = src.meta.copy()
         dst_kwargs.update({"crs": dst_crs,
                            "transform": dst_transform,
@@ -263,12 +341,12 @@ def basic_pixel_coregistration(infile: str, match: str,
                            "nodata": nodata})
 
         logger.debug(
-            f"Immagine coregistrata a dimensioni: {dst_height}, {dst_width}")
+            f"Coregistered image dimensions: {dst_height}, {dst_width}")
 
         # Output
-        logger.info(f"Esporto immagine: {outfile}")
+        logger.info(f"Exporting image: {outfile}")
         with rasterio.open(outfile, "w", **dst_kwargs) as dst:
-            # itero tutte le bande di 'infile'
+            # Iterate through all bands in 'infile'
             for i in range(1, src.count + 1):
                 reproject(source=rasterio.band(src, i),
                           destination=rasterio.band(dst, i),

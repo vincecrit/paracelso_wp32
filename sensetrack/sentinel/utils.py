@@ -33,13 +33,50 @@ from bs4 import BeautifulSoup
 
 OrbitProperties = namedtuple(
     "OrbitProperties", ['ORBIT_PASS', 'NODE_TIME', 'RELORBIT'])
+"""
+Named tuple containing Sentinel-1 orbit properties.
+
+Fields:
+    ORBIT_PASS (str): Orbit pass direction ('ASCENDING' or 'DESCENDING')
+    NODE_TIME (str): Node time in format 'YYYYMMDDTHHmmssSSS'
+    RELORBIT (str): Relative orbit number
+"""
 
 
 def reformat_node_time(NODE_TIME: str) -> str:
+    """
+    Convert ISO8601 node time to compact format.
+
+    Args:
+        NODE_TIME (str): Node time in ISO8601 format
+
+    Returns:
+        str: Node time in format 'YYYYMMDDTHHmmssSSS'
+    """
     return datetime.fromisoformat(NODE_TIME).strftime("%Y%m%dT%H%M%S%f")
 
 
 def read_orbit_properties(SARFILE: str | Path) -> OrbitProperties:
+    """
+    Extract orbit properties from a Sentinel-1 SAFE product archive.
+
+    This function reads the manifest.safe file inside the zip archive to extract
+    orbit pass direction, node time, and relative orbit number.
+
+    Args:
+        SARFILE (str | Path): Path to the Sentinel-1 product zip file
+
+    Returns:
+        OrbitProperties: Named tuple containing:
+            - ORBIT_PASS: Orbit pass direction ('ASCENDING' or 'DESCENDING')
+            - NODE_TIME: Node time in format 'YYYYMMDDTHHmmssSSS'
+            - RELORBIT: Relative orbit number
+
+    Raises:
+        AssertionError: If the input file does not exist
+        zipfile.BadZipFile: If the input is not a valid zip file
+        IndexError: If the manifest.safe file is not found
+    """
     SARFILE = Path(SARFILE)
 
     assert SARFILE.is_file()
@@ -58,6 +95,24 @@ def read_orbit_properties(SARFILE: str | Path) -> OrbitProperties:
 
 
 def s1_mean_incidence_angle_rad(zip_path, polarization="vv"):
+    """
+    Calculate mean incidence angle from Sentinel-1 annotation files.
+
+    This function extracts incidence angles from all annotation XML files
+    for a given polarization and calculates their mean value in radians.
+
+    Args:
+        zip_path: Path to the Sentinel-1 product zip file
+        polarization (str, optional): Polarization to process ('vv' or 'vh'). 
+                                    Defaults to "vv"
+
+    Returns:
+        float: Mean incidence angle in radians
+
+    Raises:
+        ValueError: If no incidence angle values are found in the XML files
+        zipfile.BadZipFile: If the input is not a valid zip file
+    """
     all_angles = []
 
     with zipfile.ZipFile(zip_path, 'r') as archive:
@@ -85,7 +140,7 @@ def s1_mean_incidence_angle_rad(zip_path, polarization="vv"):
 
     if not all_angles:
         raise ValueError(
-            "Nessun valore di angolo di incidenza trovato nei file XML.")
+            "No incidence angle values found in XML files.")
 
     avg_angle = sum(all_angles) / len(all_angles)
 

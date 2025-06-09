@@ -1,6 +1,7 @@
 """
 utils.py
-This module provides utility classes and functions for string manipulation within the sensetrack.cosmo package.
+This module provides utility classes and functions for
+string manipulation within the sensetrack.cosmo package.
 """
 import math
 from datetime import datetime
@@ -12,26 +13,6 @@ import numpy as np
 import shapely
 
 from sensetrack.cosmo import lib
-
-
-class StrChopper:
-    def __init__(self, s: str) -> None:
-        self._s = s
-
-    @property
-    def s(self): return self._s
-
-    @s.setter
-    def s(self, value: str): self._s = value
-
-    def chop(self, n):
-        l = list(self.s)
-
-        chunck = "".join([l.pop(0) for _ in range(n)])
-
-        self.s = "".join(l)
-
-        return chunck
 
 
 def show_dataset_attr(h5_file, path_to_dataset):

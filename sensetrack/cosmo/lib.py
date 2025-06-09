@@ -35,7 +35,10 @@ Usage:
 This module is intended for internal use within the sensetrack.cosmo package to facilitate the reading, parsing, and interpretation of COSMO-SkyMed product files and their metadata.
 '''
 
+from pathlib import Path
+import re
 from collections import namedtuple
+from datetime import datetime
 from enum import Enum, unique
 
 import h5py
@@ -46,37 +49,6 @@ from PIL import Image
 import sensetrack.cosmo.utils as utils
 
 
-@unique
-class Polarization(Enum):
-
-    HH = "Horizontal Tx/Horizontal Rx"
-    VV = "Vertical Tx/ Vertical Rx"
-    HV = "Horizontal Tx/ Vertical Rx"
-    VH = "Vertical Tx/ Horizontal Rx"
-    CO = "Co-polar acquisition (HH/VV)"
-    CH = "Cross polar acquisition (HH/HV) with Horizontal Tx polarization"
-    CV = "Cross polar acquisition (VV/VH) with Vertical Tx polarization"
-
-
-@unique
-class Orbit(Enum):
-    A = 'Ascending'
-    D = 'Descending'
-
-
-@unique
-class CosmoProduct(Enum):
-    CSG = "2nd generation"
-    CSK = "1st generation"
-
-
-@unique
-class Squint(Enum):
-    N = "Not squinted data"
-    F = "Forward squint"
-    B = "Backward squint"
-
-
 class Product:
 
     _MISSION = None
@@ -85,16 +57,9 @@ class Product:
 
     _o = dict(A='Ascending', D='Descending')
 
-    @classmethod
-    def _is_2ndgen(cls, value: str) -> bool:
-
-        if value == cls._MISSION:
-            return True
-        else:
-            return False
-
 
 CSKInfo = namedtuple("CSKInfo", [
+    "Mission",
     "SatelliteID",
     "ProductType",
     "InstrumentMode",
@@ -110,6 +75,7 @@ CSKInfo = namedtuple("CSKInfo", [
 
 
 CSGInfo = namedtuple("CSGInfo", [
+    "Mission",
     'SatelliteID',
     'ProductType',
     'NumRangeLooks',
@@ -158,36 +124,48 @@ class CSKProduct(Product):
     _G = dict(N='ON', F='OFF')
 
     @classmethod
-    def parse_filename(cls, filename: str):
+    def parse_filename_regex(cls, stem: str):
+        """
+        Parse Cosmo Product metadata from filename.
 
-        NAME = utils.StrChopper(filename)
-        mission = NAME.chop(3)
+        Args:
+            filename (str): The filename to parse.
 
-        if not cls._is_2ndgen(mission):
-            raise ValueError("Non è un file CSK (I generazione)")
+        Returns:
+            CSKInfo: A named tuple containing all the parsed information.
 
-        i = NAME.chop(2)
-        _ = NAME.chop(1)
-        YYY_Z = NAME.chop(5)
-        _ = NAME.chop(1)
-        MM = NAME.chop(2)
-        _ = NAME.chop(1)
-        SS = NAME.chop(2)
-        _ = NAME.chop(1)
-        PP = NAME.chop(2)
-        _ = NAME.chop(1)
-        s = NAME.chop(1)
-        o = NAME.chop(1)
-        _ = NAME.chop(1)
-        D = NAME.chop(1)
-        G = NAME.chop(1)
-        _ = NAME.chop(1)
-        start = utils.str2dt(NAME.chop(14))
-        _ = NAME.chop(1)
-        end = utils.str2dt(NAME.chop(14))
+        Raises:
+            ValueError: If the filename doesn't match the expected CSG format.
+        """
+
+        pattern = r"""
+        CSK
+        (\w{2})_ # satellite ID
+        (\w{5})_ # product type
+        (\w{2})_ # instrument mode
+        (\w{2})_ # swath
+        (\w{2})_ # polarization
+        (\w) # look side
+        (\w)_ # oribit direction
+        (\w) # delivery mode
+        (\w)_ # selective avaialability
+        (\w{14})_ # Sensing start time
+        (\w{14}) # Sensing end time
+        """
+
+        match = re.match(pattern, stem, re.VERBOSE)
+
+        if not match:
+            raise ValueError(f"Invalid CSK filename format: {stem}")
+
+        (i, YYY_Z, MM, SS, PP, s, o,
+         D, G, start_str, end_str) = match.groups()
+
+        start = utils.str2dt(start_str)
+        end = utils.str2dt(end_str)
 
         msg = f"""
-        {filename}
+        {stem}
         COSMO-SkyMed (I Generation)
 
         Satellite ID:            {i}
@@ -205,7 +183,7 @@ class CSKProduct(Product):
 
         print(msg)
 
-        return CSKInfo(i, YYY_Z, cls._MM[MM], SS, cls._PP[PP], cls._s[s],
+        return CSKInfo(cls._MISSION, i, YYY_Z, cls._MM[MM], SS, cls._PP[PP], cls._s[s],
                        cls._o[o], cls._D[D], cls._G[G], start, end)
 
 
@@ -278,56 +256,60 @@ class CSGProduct(Product):
         return descr
 
     @classmethod
-    def parse_filename(cls, filename: str):
+    def parse_filename_regex(cls, stem: str):
+        """
+        Parse Cosmo Product metadata from filename.
 
-        NAME = utils.StrChopper(filename)
-        mission = NAME.chop(3)
+        Args:
+            filename (str): The filename to parse.
 
-        if not cls._is_2ndgen(mission):
-            raise ValueError("Non è un file CSK (I generazione)")
+        Returns:
+            CSGInfo: A named tuple containing all the parsed information.
 
-        _ = NAME.chop(1)
-        i = NAME.chop(5)
-        _ = NAME.chop(1)
-        YYY_Z = NAME.chop(5)
-        _ = NAME.chop(1)
-        RR = NAME.chop(2)
-        AA = NAME.chop(2)
-        _ = NAME.chop(1)
-        MMM = NAME.chop(3)
-        _ = NAME.chop(1)
-        SSS = NAME.chop(3)
-        _ = NAME.chop(1)
-        PP = NAME.chop(2)
-        _ = NAME.chop(1)
-        s = NAME.chop(1)
-        o = NAME.chop(1)
-        _ = NAME.chop(1)
-        Q = NAME.chop(1)
-        _ = NAME.chop(1)
-        start = utils.str2dt(NAME.chop(14))
-        _ = NAME.chop(1)
-        end = utils.str2dt(NAME.chop(14))
-        _ = NAME.chop(1)
-        j = NAME.chop(1)
-        _ = NAME.chop(1)
-        S = NAME.chop(1)
-        _ = NAME.chop(1)
-        ll = NAME.chop(2)
-        H = NAME.chop(1)
-        _ = NAME.chop(1)
-        ZLL = NAME.chop(3)
-        _ = NAME.chop(1)
-        AAA = NAME.chop(3)
+        Raises:
+            ValueError: If the filename doesn't match the expected CSG format.
+        """
+
+        pattern = r"""
+            CSG_    # Mission name
+            (\w{5})_ # Satellite ID
+            (\w{5})_ # Product Type
+            (\d{2})  # Range looks
+            (\d{2})_ # Azimuth looks
+            (\w{3})_ # Instrument mode
+            (\w{3})_ # Swath
+            (\w{2})_ # Polarization
+            ([LR])   # Look side
+            ([AD])_  # Orbit Direction
+            ([DPFR])_# Orbital data quality
+            (\d{14})_# Start time
+            (\d{14})_# End time
+            (\w)_    # File sequence ID
+            ([FC])_  # Product coverage
+            (\d{2})  # Latitude
+            ([NS])_  # Hemisphere
+            (Z\d{2})_# East location
+            ([NFB]\d{2})  # Squint angle
+        """
+
+        match = re.match(pattern, stem, re.VERBOSE)
+        if not match:
+            raise ValueError(f"Invalid CSG filename format: {stem}")
+
+        (i, YYY_Z, RR, AA, MMM, SSS, PP, s, o, Q,
+         start_str, end_str, j, S, ll, H, ZLL, AAA) = match.groups()
+
+        start = utils.str2dt(start_str)
+        end = utils.str2dt(end_str)
 
         msg = f"""
-        {filename}
+        {stem}
         COSMO-SkyMed (II Generation)
 
         Satellite ID:              {i}
         Product Type:              {YYY_Z}
         Number of range looks:     {RR}
-        Number of azimuth looks:   {RR}
+        Number of azimuth looks:   {AA}
         Instrument mode:           {cls._MMM[MMM]}
         Swath:                     {SSS}
         Polarization:              {cls._PP[PP]}
@@ -346,9 +328,66 @@ class CSGProduct(Product):
 
         print(msg)
 
-        return CSGInfo(i, YYY_Z, RR, RR, cls._MMM[MMM], SSS, cls._PP[PP],
+        return CSGInfo(cls._MISSION, i, YYY_Z, RR, AA, cls._MMM[MMM], SSS, cls._PP[PP],
                        cls._s[s], cls._o[o], cls._Q[Q], start, end, j, cls._S[S],
                        int(ll), cls._H[H], cls._LL(ZLL), cls._AAA(AAA))
+
+
+class CosmoFilenameParser:
+    """
+    A factory class for parsing COSMO-SkyMed filenames.
+
+    This class implements the factory pattern to create CSKInfo or CSGInfo objects
+    based on the filename format.
+    """
+
+    @staticmethod
+    def create_from_filename(filename: str) -> CSKInfo | CSGInfo:
+        """
+        Factory method to create the appropriate info object based on the filename.
+
+        Args:
+            filename (str): The filename to parse
+
+        Returns:
+            Union[CSKInfo, CSGInfo]: The parsed information in the appropriate format
+
+        Raises:
+            ValueError: If the filename format is not recognized
+        """
+        filename = Path(filename)
+
+        if not filename.exists():
+            raise FileNotFoundError(f"{filename} does not exists.")
+
+        elif not filename.suffix == ".h5":
+            raise ValueError(
+                f"Invalid Cosmo product format. Expected `.h5` got {filename.suffix}")
+
+        stem = filename.stem
+
+        if stem.startswith('CSK'):
+            return CSKProduct.parse_filename_regex(filename)
+        
+        elif stem.startswith('CSG'):
+            return CSGProduct.parse_filename_regex(filename)
+        
+        else:
+            raise ValueError(f"Unrecognized COSMO-SkyMed product: {filename}")
+
+    @staticmethod
+    def parse_metadata(filename: str) -> dict:
+        """
+        Parses the filename and returns a dictionary of metadata.
+
+        Args:
+            filename (str): The filename to parse
+
+        Returns:
+            dict: A dictionary containing all parsed metadata
+        """
+        info = CosmoFilenameParser.create_from_filename(filename)
+        return info._asdict()  # Convert named tuple to dictionary
 
 
 class CSKFile(h5py.File):
@@ -412,8 +451,3 @@ class CSKFile(h5py.File):
     def footprint_polygon(self) -> shapely.Geometry:
         y, x, _ = np.array(self.estimated_corner_coordinated).T
         return shapely.Polygon(np.c_[x, y])
-
-
-class Pols(dict):
-    def __init__(self) -> None:
-        return super().__init__()
