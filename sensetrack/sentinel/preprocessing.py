@@ -54,9 +54,49 @@ class S1Preprocessor(SARPreprocessor):
     for Sentinel-1 data, including multilook estimation, orbit property extraction,
     and SNAP GPT graph execution.
     """
+    """
+    Preprocessor for Sentinel-1 SAR data using SNAP GPT.
+    
+    This class extends SARPreprocessor to implement specific preprocessing workflows
+    for Sentinel-1 data, including multilook estimation, orbit property extraction,
+    and SNAP GPT graph execution.
+    """
     def __init__(self, SUBSET: GPTSubsetter, PROCESS: SARPreprocessing) -> None:
+        """
+        Initialize the S1Preprocessor.
+
+        Args:
+            SUBSET (GPTSubsetter): Subsetter object defining the area of interest
+            PROCESS (SARPreprocessing): Preprocessing workflow to apply
+        """
         super().__init__(SUBSET, PROCESS)
 
+    def run(self, SARFILE: str | Path, CRS: str = "EPSG:32632") -> None:
+        """
+        Execute the preprocessing workflow on a Sentinel-1 SAR file.
+
+        This method performs the following steps:
+        1. Estimates multilook parameters
+        2. Validates input file format
+        3. Extracts orbit properties
+        4. Constructs output filename
+        5. Runs SNAP GPT with appropriate parameters
+
+        Args:
+            SARFILE (str | Path): Path to input Sentinel-1 SAR file
+            CRS (str, optional): Target coordinate reference system. Defaults to "EPSG:32632"
+
+        Raises:
+            ValueError: If the input file is not a zip archive
+        """
+        ml = self.estimate_multilook_parms(SARFILE, S1_IW_SLC(), 1)
+        logger.debug(f"Multilook parameters and final resolution: {ml}")
+        SARFILE = Path(SARFILE)
+
+        if not SARFILE.suffix == '.zip':
+            raise ValueError("SAR file must be a zip archive")
+
+        orbit_properties = read_orbit_properties(SARFILE)
     def run(self, S1FILE: str | Path, CRS: str = "EPSG:32632") -> None:
         """
         Execute the preprocessing workflow on a Sentinel-1 SAR file.
@@ -91,6 +131,33 @@ class S1Preprocessor(SARPreprocessor):
                 ],
                shell=True)
 
+
+def main(preprocessor, file, workflow, aoi):
+    """
+    Main entry point for SAR preprocessing execution.
+
+    This function validates inputs, sets up the preprocessing environment,
+    and executes the specified workflow.
+
+    Args:
+        preprocessor: Preprocessor class to use (typically S1Preprocessor)
+        file (str): Path to input SAR file
+        workflow (str): Name of preprocessing workflow to apply
+        aoi (str): Path to area of interest file (shapefile or GeoPackage)
+
+    Returns:
+        None. Exits with status code:
+        - -1: If AOI file is invalid or not found
+        - 1: On successful completion
+        
+    Raises:
+        AssertionError: If specified workflow is not supported
+    """
+    import sys
+
+    __processes = list(SARPreprocessing._member_map_.keys())
+
+    assert workflow.upper() in __processes
         return S1FILE.parent / OUTPUT_FILE
 
 
@@ -141,6 +208,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=main.__doc__)
 
     parser.add_argument("--file", required=True,
+                        help="Path to the SAR file to process", type=str)
+    parser.add_argument("--workflow", required=True,
+                        help="Preprocessing workflow to apply",
                         help="Path to the SAR file to process",
                         type=str)
     parser.add_argument("--graph_name", required=True,
@@ -148,8 +218,10 @@ if __name__ == "__main__":
                         type=str)
     parser.add_argument("--aoi", required=True,
                         help="Area of interest (ESRI Shapefile or GeoPackage)",
+                        help="Area of interest (ESRI Shapefile or GeoPackage)",
                         type=str)
 
     kwargs = vars(parser.parse_args())
 
+    main(S1Preprocessor, **args)
     main(**kwargs)

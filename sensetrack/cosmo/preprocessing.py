@@ -95,10 +95,12 @@ class CosmoPreprocessor(SARPreprocessor):
         sp.run(["gpt.exe",
                 self.GRAPH,
                 f'-Pinput='+str(COSMOFILE),
+                f'-Pinput='+str(COSMOFILE),
                 f'-PnRgLooks={ml.Num_Range_LOOKS}',
                 f'-PnAzLooks={ml.Num_Azimuth_LOOKS}',
                 f'-PmapProjection={CRS}',
                 f'-PgeoRegion={self.SUBSET.geometry.__str__()}',
+                f'-Poutput={str(COSMOFILE.parent / OUTPUT_FILE)}'
                 f'-Poutput={str(COSMOFILE.parent / OUTPUT_FILE)}'
                 ],
                shell=True)
@@ -154,11 +156,18 @@ if __name__ == "__main__":
                         type=str)
     parser.add_argument("--graph_name", required=True,
                         help="Processing graph to be used",
+                        help="Cosmo-Skymed product file path",
+                        type=str)
+    parser.add_argument("--graph_name", required=True,
+                        help="Processing graph to be used",
                         type=str)
     parser.add_argument("--aoi", required=True,
+                        help="Area Of Interest (ESRI Shapefile or GeoPackage)",
                         help="Area Of Interest (ESRI Shapefile or GeoPackage)",
                         type=str)
 
     kwargs = vars(parser.parse_args())
+    kwargs = vars(parser.parse_args())
 
+    main(**kwargs)
     main(**kwargs)

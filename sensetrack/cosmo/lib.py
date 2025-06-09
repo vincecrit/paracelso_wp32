@@ -293,7 +293,6 @@ class CSGProduct(Product):
         """
 
         match = re.match(pattern, stem, re.VERBOSE)
-        
         if not match:
             raise ValueError(f"Invalid CSG filename format: {stem}")
 
@@ -343,7 +342,7 @@ class CosmoFilenameParser:
     """
 
     @staticmethod
-    def create_from_filename(filename: str | Path) -> CSKInfo | CSGInfo:
+    def create_from_filename(filename: str) -> CSKInfo | CSGInfo:
         """
         Factory method to create the appropriate info object based on the filename.
 
@@ -368,10 +367,10 @@ class CosmoFilenameParser:
         stem = filename.stem
 
         if stem.startswith('CSK'):
-            return CSKProduct.parse_filename_regex(stem)
+            return CSKProduct.parse_filename_regex(filename)
         
         elif stem.startswith('CSG'):
-            return CSGProduct.parse_filename_regex(stem)
+            return CSGProduct.parse_filename_regex(filename)
         
         else:
             raise ValueError(f"Unrecognized COSMO-SkyMed product: {filename}")
