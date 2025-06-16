@@ -34,14 +34,25 @@ from zipfile import BadZipFile
 from bs4 import BeautifulSoup
 
 S1Info = namedtuple(
-    "OrbitProperties", ['ORBIT_PASS', 'NODE_TIME', 'RELORBIT'])
+    "S1Info", ['ORBIT_PASS', 'NODE_TIME', 'RELATIVE_ORBIT',
+               'PLATFORM', 'MODE', 'PRODUCT', 'RES',
+               'LEVEL', 'CLASS', 'ABSOLUTEORB',
+               'DATAID', 'ID'])
 """
 Named tuple containing Sentinel-1 orbit information.
 
 Fields:
     ORBIT_PASS (str): Orbit pass direction ('ASCENDING' or 'DESCENDING')
     NODE_TIME (str): Node time in format 'YYYYMMDDTHHmmssSSS'
-    RELORBIT (str): Relative orbit number
+    RELATIVE_ORBIT (str): Relative orbit number
+    PLATFORM (str): Satellite name
+    MODE (str): Acquisition mode
+    RES (str): Level of resolution
+    LEVEL (str): Processing level
+    CLASS (str): Product class
+    ABSOLUTEORB (str): Absolute orbit number
+    DATAID (str): Data take id
+    ID (str): Unique product identifier
 """
 
 
@@ -64,7 +75,7 @@ class S1ManifestParser:
     """
 
     @classmethod
-    def s1slc_orbit_properties(cls, S1FILE: str | Path) -> S1Info:
+    def s1slc_orbit_properties(cls, S1FILE: str | Path) -> tuple[str, str, str]:
         """
         Extract minimal orbit properties from a Sentinel-1 SLC product archive.
 
@@ -94,14 +105,42 @@ class S1ManifestParser:
             xmlf = zf.read(xml_name)
 
             soup = BeautifulSoup(xmlf, 'xml')
-            properties = soup.find_all("orbitProperties")[0]
-            ORBIT_PASS = properties.find("pass").text
-            NODE_TIME = properties.find("ascendingNodeTime").text
-            RELORBIT = soup.find_all("relativeOrbitNumber")[0].text
+
+            # Relative orbit
+            relorbit_elem = soup.select_one("relativeOrbitNumber")
+
+            if not relorbit_elem:
+                raise ValueError("Missing relative orbit number")
+            RELORBIT = relorbit_elem.text
+
+            # Orbit properties
+            properties = soup.select_one("orbitProperties")
+
+            if properties is None:
+                raise ValueError("Error in parsing manifest file")
+
+            # Orbit pass
+            orbit_pass_elem = properties.find("pass")
+
+            if not orbit_pass_elem or not orbit_pass_elem.text:
+                raise ValueError("Missing ascending node time")
+            else:
+                ORBIT_PASS = orbit_pass_elem.text
+
+            # Node time
+            node_time_elem = properties.select_one("ascendingNodeTime")
+
+            if not node_time_elem or not node_time_elem.text:
+                raise ValueError("Missing ascending node time")
+            NODE_TIME = node_time_elem.text
 
             return ORBIT_PASS, reformat_node_time(NODE_TIME), RELORBIT
-    
-    def create_from_filename(cls, filename: str | Path):
+
+    @classmethod
+    def parse_filename_regex(cls, filename: str | Path) -> tuple:
+
+        filename = Path(filename)
+
         pattern = r"""
         (S1[A|B])_ # platform
         (\w{2})_ # imaging mode
@@ -110,26 +149,42 @@ class S1ManifestParser:
         (\w{1}) # processing level
         (\w{1}) # product class
         (\w{2})_ # polarization
-        (\w{4}) # product start time
-        (\w{2})
-        (\w{2})T
-        (\w{2}) 
-        (\w{2})
-        (\w{2})_
-        (\w{4}) # product end time
-        (\w{2})
-        (\w{2})T
-        (\w{2}) 
-        (\w{2})
-        (\w{2})_
+        (\w{15})_ # product start time
+        (\w{15})_ # product end time
         (\w{6})_ # absolute orbit number
         (\w{6})_ # mission data take id
         (\w{4}). # unique identifier
         """
 
+        match_obj = re.match(pattern, filename.stem)
+
+        if not match_obj:
+            raise ValueError(f"Invalid Sentinel-1 file name: {filename}")
+
+        (PLATFORM, MODE, PRODUCT, RES, LEVEL, CLASS,
+         STARTTIME, ENDTIME, ABSOLUTEORB, DATAID, ID) = match_obj.groups()
+
+        start_time = datetime.strptime(STARTTIME, "%Y%m%dT%H%M%S")
+        end_time = datetime.strptime(ENDTIME, "%Y%m%dT%H%M%S")
+
+        return (PLATFORM, MODE, PRODUCT, RES, LEVEL, CLASS,
+                start_time, end_time, ABSOLUTEORB, DATAID, ID)
 
     @classmethod
-    def parse_metadata(filename: str) -> dict:
+    def create_from_filename(cls, filename: str | Path):
+
+        ORBIT_PASS, NODE_TIME, RELATIVE_ORBIT = cls.s1slc_orbit_properties(
+            filename)
+        
+        (PLATFORM, MODE, PRODUCT, RES, LEVEL, CLASS,
+         _, _, ABSOLUTEORB, DATAID, ID) = cls.parse_filename_regex(filename)
+        
+        return S1Info(ORBIT_PASS, NODE_TIME, RELATIVE_ORBIT,
+                      PLATFORM, MODE, PRODUCT, RES, LEVEL,
+                      CLASS, ABSOLUTEORB, DATAID, ID)
+
+    @classmethod
+    def parse_metadata(cls, filename: str) -> dict:
         """
         Parses the filename and returns a dictionary of metadata.
 
@@ -139,9 +194,9 @@ class S1ManifestParser:
         Returns:
             dict: A dictionary containing all parsed metadata
         """
-        info = S1ManifestParser.s1slc_orbit_properties(filename)
+        info = S1ManifestParser.create_from_filename(filename)
         return info._asdict()  # Convert named tuple to dictionary
-            
+
 
 def s1_mean_incidence_angle_rad(zip_path, polarization="vv"):
     """

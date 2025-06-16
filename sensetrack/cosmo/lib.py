@@ -153,13 +153,13 @@ class CSKProduct(Product):
         (\w{14}) # Sensing end time
         """
 
-        match = re.match(pattern, stem, re.VERBOSE)
+        match_obj = re.match(pattern, stem, re.VERBOSE)
 
-        if not match:
+        if not match_obj:
             raise ValueError(f"Invalid CSK filename format: {stem}")
 
         (i, YYY_Z, MM, SS, PP, s, o,
-         D, G, start_str, end_str) = match.groups()
+         D, G, start_str, end_str) = match_obj.groups()
 
         start = utils.str2dt(start_str)
         end = utils.str2dt(end_str)
@@ -231,6 +231,7 @@ class CSGProduct(Product):
         C='Cropped product'
     )
 
+    @staticmethod
     def _LL(s: str):
         assert s[0] == 'Z'
 
@@ -244,6 +245,7 @@ class CSGProduct(Product):
 
         return descr
 
+    @staticmethod
     def _AAA(s: str):
         if s[0] == 'N':
             descr = 'Not squinted data'
@@ -342,7 +344,7 @@ class CosmoFilenameParser:
     """
 
     @staticmethod
-    def create_from_filename(filename: str) -> CSKInfo | CSGInfo:
+    def create_from_filename(filename: str | Path) -> CSKInfo | CSGInfo:
         """
         Factory method to create the appropriate info object based on the filename.
 
@@ -367,10 +369,10 @@ class CosmoFilenameParser:
         stem = filename.stem
 
         if stem.startswith('CSK'):
-            return CSKProduct.parse_filename_regex(filename)
+            return CSKProduct.parse_filename_regex(filename.stem)
         
         elif stem.startswith('CSG'):
-            return CSGProduct.parse_filename_regex(filename)
+            return CSGProduct.parse_filename_regex(filename.stem)
         
         else:
             raise ValueError(f"Unrecognized COSMO-SkyMed product: {filename}")
@@ -408,11 +410,10 @@ class CSKFile(h5py.File):
                          meta_block_size, **kwds)
 
     def __str__(self):
-        return CSKProduct.parse_filename(
-            self.attrs['Product Filename'].decode()).__str__()
+        return CSKProduct.parse_filename_regex(self.product_filename).__str__()
 
     def __repr__(self):
-        return self.attrs['Product Filename'].decode()
+        return self.product_filename
 
     @property
     def qkl_to_numpy(self): return np.array(self['/S01/QLK'])
@@ -422,6 +423,10 @@ class CSKFile(h5py.File):
 
     @property
     def qlk_to_image(self): return Image.fromarray(self.qkl_to_numpy)
+
+    @property
+    def product_filename(self) -> str:
+        return str(self.attrs['Product Filename'])
 
     @property
     def _etlc(self):

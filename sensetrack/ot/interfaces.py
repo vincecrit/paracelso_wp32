@@ -33,7 +33,8 @@ from pathlib import Path
 
 import cv2
 import numpy as np
-from rasterio import CRS, Affine
+from rasterio import Affine
+from rasterio.crs import CRS
 
 from sensetrack.log import setup_logger
 
@@ -55,13 +56,8 @@ class Image:
         nodata (int | float): Value used to represent no data in the image
         bandnames (tuple): Names of the image bands
     """
-    _image = None
-    _affine = None
-    _crs = None
-    _nodata = None
-
     def __init__(self, image: np.ndarray, affine: Affine,
-                 crs: CRS, nodata: int | float = None):
+                 crs: str, nodata: float | None = None) -> None:
         """
         Initialize an Image instance.
 
@@ -77,18 +73,24 @@ class Image:
         if image.ndim < 2:
             raise ValueError("Image array must have at least 2 dimensions.")
 
-        self.image = image
+        self._image = image
         splitted = cv2.split(image)
         self.bandnames = self.__get_bandnames(len(splitted))
 
         for bandname, band_array in zip(self.bandnames, splitted):
             setattr(self, bandname, band_array)
 
-        self.affine = affine
-        self.crs = crs
-        self.nodata = nodata
+        self._affine = affine
+        self._crs = crs
 
-    def __new__(cls, image, affine, crs, nodata=None):
+        if nodata is None:
+            image[image < 0] = -9999.
+            self._nodata = -9999.9
+            logger.debug(f"Inferring/setting nodata values: {nodata = :.1f}")
+        else:
+            self._nodata = nodata
+
+    def __new__(cls, image: np.ndarray, affine: Affine, crs: str, nodata: float = -9999.):
         """
         Allocate a new Image instance.
 
@@ -156,7 +158,7 @@ class Image:
         return self._affine
 
     @affine.setter
-    def affine(self, value):
+    def affine(self, value: Affine):
         self._affine = value
 
     @property
@@ -168,7 +170,7 @@ class Image:
         self._crs = value
 
     @property
-    def n_channels(self):
+    def n_channels(self) -> int:
         """
         Get the number of channels in the image.
 
@@ -187,11 +189,11 @@ class Image:
         """
         if self.n_channels == 2:
             return 1
-        else:
+        elif self.image is not None:
             return self.image.shape[self.n_channels-1]
 
     @property
-    def mask(self):
+    def mask(self) -> np.ndarray:
         """
         Get a mask of nodata values.
 
@@ -201,14 +203,14 @@ class Image:
         return np.equal(self.image, self.nodata)
 
     @property
-    def shape(self):
+    def shape(self) -> tuple[int, int]:
         """
         Get the shape of the first band.
 
         Returns:
             tuple: Shape of the first band (height, width)
         """
-        return self.get_band(0).image.shape
+        return self.image.shape
 
     @property
     def height(self):
@@ -218,7 +220,7 @@ class Image:
         Returns:
             int: Height in pixels
         """
-        return self.get_band(0).image.shape[0]
+        return self.shape[0]
 
     @property
     def width(self):
@@ -228,7 +230,7 @@ class Image:
         Returns:
             int: Width in pixels
         """
-        return self.get_band(0).image.shape[1]
+        return self.shape[1]
 
     def split_channels(self):
         """
@@ -267,27 +269,28 @@ class Image:
                 "Coregistration check for non-raster images is approximate.")
             return self.shape == __other.shape
 
-    def get_band(self, n: str | int | None = None):
-        """
-        Get a specific band from the image.
 
-        Args:
-            n (str | int | None): Band identifier. Can be band name (str), 
-                                 index (int), or None for entire image
+def get_band(image: Image, n: str | int = 0) -> Image | None:
+    """
+    Get a specific band from the image.
 
-        Returns:
-            Image: New Image instance containing the requested band
-        """
-        if n in self.bandnames:
-            band = self.__getattribute__(n)
-            return Image(band, self.affine, self.crs, self.nodata)
+    Args:
+        n (str | int | None): Band identifier. Can be band name (str), 
+                                index (int), or None for entire image
 
-        elif isinstance(n, int):
-            band = self[n]
-            return Image(band, self.affine, self.crs, self.nodata)
+    Returns:
+        Image: New Image instance containing the requested band
+    """
+    if isinstance(n, str):
+        band = image.__getattribute__(n)
+        return Image(band, image.affine, image.crs, image.nodata)
 
-        elif n is None:
-            return self
+    elif isinstance(n, int):
+        band = image[n]
+        return Image(band, image.affine, image.crs, image.nodata)
+
+    else:
+        return
 
 
 class OTAlgorithm(ABC):
@@ -364,7 +367,7 @@ class OTAlgorithm(ABC):
 
         return cls.from_dict(__d)
 
-    def toJSON(self, file: str | Path = None) -> None:
+    def toJSON(self, file: str | Path | None = None) -> None:
         """
         Save algorithm parameters to a JSON file.
 

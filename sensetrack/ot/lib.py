@@ -99,7 +99,7 @@ def is_identity_affine(affine: rasterio.Affine) -> bool:
         return False
 
 
-def rasterio_open(source: str, band: int | None = None) -> tuple:
+def rasterio_open(source: str | Path, band: int | None = None) -> tuple:
     """
     Open a raster file using rasterio and convert to OpenCV format.
     
@@ -114,6 +114,7 @@ def rasterio_open(source: str, band: int | None = None) -> tuple:
         ValueError: If requested band index is out of range
         RasterioIOError: If file cannot be opened
     """
+    source = Path(source)
     logger.debug(f"Loading {source} with rasterio.")
 
     try:
@@ -136,12 +137,12 @@ def rasterio_open(source: str, band: int | None = None) -> tuple:
             crs = src.meta['crs']
 
             return dataset, affine, crs
-    except rasterio.errors.RasterioIOError as e:
+    except RasterioIOError as e:
         logger.error(f"Failed to open {source}: {e}")
         raise
 
 
-def image_to_rasterio(img: Image, outfile) -> None:
+def image_to_rasterio(img: Image, outfile: str | Path) -> None:
     """
     Save an Image object to a raster file using rasterio.
     
@@ -153,15 +154,20 @@ def image_to_rasterio(img: Image, outfile) -> None:
         ValueError: If img is not an Image instance
         Various rasterio errors if file cannot be written
     """
+    outfile = Path(outfile)
+
     if not is_image(img):
         raise ValueError(f"Invalid argument type. Expected {type(Image)}, got {type(img)}")
 
     driver = rasterio.drivers.driver_from_extension(outfile)
     try:
-        with rasterio.open(outfile, "w", transform=img.affine, driver=driver, crs=img.crs, nodata=img.nodata,
-                           width=img.width, height=img.height, dtype=img.image.dtype, count=1) as ds:
+        with rasterio.open(outfile, "w", transform=img.affine, driver=driver,
+                           crs=img.crs, nodata=img.nodata,
+                           width=img.width, height=img.height,
+                           dtype=img.image.dtype, count=1) as ds:
             ds.write(img.image, 1)
-    except (DriverCapabilityError, DriverRegistrationError, PathError, RasterioIOError) as err:
+    except (DriverCapabilityError, DriverRegistrationError,
+            PathError, RasterioIOError) as err:
         logging.critical(f"[RASTERIO] {err.__class__.__name__}: {err}")
         exit(0)
 
@@ -202,11 +208,11 @@ def write_output(output, outfile: str | Path) -> None:
         case ".tif":
             image_to_rasterio(output, outfile)
         case ".jpg":
-            raise image_to_rasterio(output, outfile)
+            image_to_rasterio(output, outfile)
         case ".jpeg":
-            raise image_to_rasterio(output, outfile)
+            image_to_rasterio(output, outfile)
         case ".png":
-            raise image_to_rasterio(output, outfile)
+            image_to_rasterio(output, outfile)
         case ".gpkg":
             geopandas_to_ogr(output, outfile)
         case ".shp":
@@ -216,7 +222,7 @@ def write_output(output, outfile: str | Path) -> None:
                 f"Unsupported file extension: {outfile.suffix}")
 
 
-def load_images(*args, nodata=None, **kwargs):
+def load_images(*args, nodata: float, **kwargs):
     """
     Load a pair of images and return them as Image objects.
 
@@ -291,8 +297,8 @@ def load_images(*args, nodata=None, **kwargs):
         return reference, target
 
 
-def basic_pixel_coregistration(infile: str, match: str,
-                               outfile: str | None = None) -> Path:
+def basic_pixel_coregistration(source: str, match: str,
+                               outfile: str | Path | None = None) -> Path:
     """
     Align pixels between a target image and a reference image.
     
@@ -313,23 +319,25 @@ def basic_pixel_coregistration(infile: str, match: str,
     3. Reprojects each band using bilinear resampling
     """
     if outfile is None:
-        out_stem = Path(infile).stem + "_coreg" + Path(infile).suffix
-        outfile = Path(infile).parent / out_stem
-
-    with rasterio.open(infile) as src:
+        out_stem = Path(source).stem + "_coreg" + Path(source).suffix
+        outfile = Path(source).parent / out_stem
+    else:
+        outfile = Path(outfile)
+    
+    with rasterio.open(source) as src:
         src_transform = src.transform
         nodata = src.meta['nodata']
 
-        with rasterio.open(match) as match:
-            dst_crs = match.crs
+        with rasterio.open(match) as mtc:
+            dst_crs = mtc.crs
 
             # Calculate output affine transform
             dst_transform, dst_width, dst_height = calculate_default_transform(
                 src.crs,
                 dst_crs,
-                match.width,
-                match.height,
-                *match.bounds,  # (left, bottom, right, top)
+                mtc.width,
+                mtc.height,
+                *mtc.bounds,  # (left, bottom, right, top)
             )
 
         # Set output metadata

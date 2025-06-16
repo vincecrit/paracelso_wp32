@@ -25,7 +25,7 @@ Dependencies:
     - sensetrack.ot.algoritmi: Provides the OpenCVOpticalFlow algorithm implementation.
     - sensetrack.ot.cli: BaseCLI class for command-line interfaces.
 """
-from ot.helpmsg import (FLAGS, FLOW, ITERATIONS, LEVELS, POLY_N, POLY_SIGMA,
+from sensetrack.ot.helpmsg import (FLAGS, FLOW, ITERATIONS, LEVELS, POLY_N, POLY_SIGMA,
                         PYR_SCALE, WINSIZE)
 
 from sensetrack.ot.algorithms import OpenCVOpticalFlow
