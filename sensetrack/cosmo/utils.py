@@ -4,7 +4,6 @@ This module provides utility classes and functions for
 string manipulation within the sensetrack.cosmo package.
 """
 import math
-from datetime import datetime
 from pathlib import Path
 
 import geopandas as gpd
@@ -77,27 +76,30 @@ def csg_shape(h5_file):
     return IMG.shape
 
 
-def csk_mean_incidence_angle_rad(h5_file):
+def csk_mean_incidence_angle_rad(h5_file) -> float | None:
     with h5py.File(h5_file, "r") as f:
         dset = f['/S01/SBI']
         attrs = dset.attrs
-        far_iangle = float(attrs['Far Incidence Angle'])
-        near_iangle = float(attrs['Near Incidence Angle'])
-        return (sum([far_iangle, near_iangle])/2 * math.pi) / 180.
+        far_iangle = attrs.get('Far Incidence Angle', None)
+        near_iangle = attrs.get('Near Incidence Angle', None)
+
+        if far_iangle and near_iangle:
+            return ((far_iangle + near_iangle) / 2 * math.pi) / 180.
+        else:
+            return
 
 
-def csg_mean_incidence_angle_rad(h5_file):
+def csg_mean_incidence_angle_rad(h5_file) -> float | None:
     with h5py.File(h5_file, "r") as f:
         dset = f['/']
         attrs = dset.attrs
-        far_iangle = float(attrs['Far Incidence Angle'])
-        near_iangle = float(attrs['Near Incidence Angle'])
+        far_iangle = attrs.get('Far Incidence Angle', None)
+        near_iangle = attrs.get('Near Incidence Angle', None)
 
-        return (sum([far_iangle, near_iangle])/2 * math.pi) / 180.
-
-
-def str2dt(s: str) -> datetime:
-    return datetime.strptime(s, "%Y%m%d%H%M%S")
+        if far_iangle and near_iangle:
+            return ((far_iangle + near_iangle) / 2 * math.pi) / 180.
+        else:
+            return
 
 
 def _get_attributes(h5: h5py.File) -> dict:
@@ -131,8 +133,8 @@ def _exploreh5(h5):
         pass
 
 
-def batch_to_image(h5_files: list, wd: str | Path = Path.cwd(),
-                   format: str = 'jpeg') -> None:
+def qlk_to_images(h5_files: list, wd: str | Path = Path.cwd(),
+                  format: str = 'jpeg') -> None:
     '''
     Esporta una lista di file CSK (formato H5) nel formato
     indicato dall'argomento `format` (default = `jpeg`)
@@ -148,11 +150,11 @@ def batch_to_image(h5_files: list, wd: str | Path = Path.cwd(),
     for csk_file in h5_files:
         jpeg = wd/f"{csk_file.stem}.{format}"
         print(f"Esporto: {jpeg}")
-        lib.CSKProduct(csk_file).qlk_to_image.save(jpeg)
+        lib.CSKFile(csk_file).qlk_to_image.save(jpeg)
 
 
 def footprints_to_geopandas(csk_files: list[str]) -> gpd.GeoDataFrame:
 
-    geoms = [lib.CSKProduct(file).footprint_polygon for file in csk_files]
+    geoms = [lib.CSKFile(file).footprint_polygon for file in csk_files]
 
     return gpd.GeoDataFrame(dict(), crs='EPSG:4326', geometry=geoms)

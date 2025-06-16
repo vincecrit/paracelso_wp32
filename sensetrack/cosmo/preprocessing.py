@@ -42,7 +42,7 @@ from pathlib import Path
 from sensetrack.cosmo import lib
 from sensetrack.log import setup_logger
 from sensetrack.snap_gpt.lib import (CSG_HIMAGE_SLC, CSK_HIMAGE_SLC,
-                                     GPTSubsetter, SARPreprocessor)
+                                     GPTSubsetter, Subset, SARPreprocessor)
 
 logger = setup_logger(__name__)
 
@@ -58,10 +58,11 @@ class CosmoPreprocessor(SARPreprocessor):
         SUBSET (GPTSubsetter): A subsetter object defining the area of interest.
         PROCESS (SARPreprocessing): The processing workflow to be applied.
     """
-    def __init__(self, SUBSET: GPTSubsetter, PROCESS: str) -> None:
+
+    def __init__(self, SUBSET: Subset, PROCESS: str) -> None:
         super().__init__(SUBSET, PROCESS)
 
-    def run(self, COSMOFILE: str | Path, CRS: str = "EPSG:32632") -> None:
+    def run(self, COSMOFILE: str | Path, CRS: str = "EPSG:32632") -> Path:
         """
         Execute preprocessing workflow on a CSG SAR product.
 
@@ -88,24 +89,29 @@ class CosmoPreprocessor(SARPreprocessor):
         OUTPUT_FILE = f"{info.Mission}_" +\
             f"{info.OrbitDirection[0]}_" +\
             f'{info.Polarization}_' +\
-            f'{info.SensingStartTime.isoformat()}_' +\
+            f'{info.SensingStartTime}_' +\
             f"[{self.SUBSET.name}]" +\
             f'[{self.PROCESS}].tif'
+        
+        logger.debug(f"Generated output name: {OUTPUT_FILE}")
 
-        sp.run(["gpt.exe",
-                self.GRAPH,
-                f'-Pinput='+str(COSMOFILE),
-                f'-Pinput='+str(COSMOFILE),
-                f'-PnRgLooks={ml.Num_Range_LOOKS}',
-                f'-PnAzLooks={ml.Num_Azimuth_LOOKS}',
-                f'-PmapProjection={CRS}',
-                f'-PgeoRegion={self.SUBSET.geometry.__str__()}',
-                f'-Poutput={str(COSMOFILE.parent / OUTPUT_FILE)}'
-                f'-Poutput={str(COSMOFILE.parent / OUTPUT_FILE)}'
-                ],
-               shell=True)
+        cmd = ["gpt.exe",
+               str(self.GRAPH),
+               f'-Pinput='+str(COSMOFILE),
+               f'-PnRgLooks={ml.Num_Range_LOOKS}',
+               f'-PnAzLooks={ml.Num_Azimuth_LOOKS}',
+               f'-PmapProjection={CRS}',
+               f'-PgeoRegion={self.SUBSET.geometry.__str__()}',
+               f'-Poutput={str(COSMOFILE.parent / OUTPUT_FILE)}']
+
+        try:
+            sp.run(cmd, check=True, capture_output=True, text=True)
+
+        except sp.CalledProcessError as e:
+            raise RuntimeError(f"GPT processing failed: {e.stderr}")
 
         return COSMOFILE.parent / OUTPUT_FILE
+
 
 def main(file, graph_name, aoi):
     """
@@ -129,7 +135,8 @@ def main(file, graph_name, aoi):
         SUBSET = GPTSubsetter.get_subset(aoi)
         preprocessor = CosmoPreprocessor(SUBSET, graph_name)
         OUTPUT_FILEPATH = preprocessor.run(Path(file))
-        logger.info(f"Cosmo product {file} successfully converted in {OUTPUT_FILEPATH}")
+        logger.info(
+            f"Cosmo product {file} successfully converted in {OUTPUT_FILEPATH}")
         exit(1)
 
     except FileNotFoundError as err:
@@ -156,18 +163,11 @@ if __name__ == "__main__":
                         type=str)
     parser.add_argument("--graph_name", required=True,
                         help="Processing graph to be used",
-                        help="Cosmo-Skymed product file path",
-                        type=str)
-    parser.add_argument("--graph_name", required=True,
-                        help="Processing graph to be used",
                         type=str)
     parser.add_argument("--aoi", required=True,
                         help="Area Of Interest (ESRI Shapefile or GeoPackage)",
-                        help="Area Of Interest (ESRI Shapefile or GeoPackage)",
                         type=str)
 
     kwargs = vars(parser.parse_args())
-    kwargs = vars(parser.parse_args())
 
-    main(**kwargs)
     main(**kwargs)

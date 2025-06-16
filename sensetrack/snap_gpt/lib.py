@@ -131,7 +131,7 @@ class SARPreprocessing(Enum):
     COSMO_HIMAGE_SLCB_DFLT = GRAPHS_WD / "cosmo_scs-b_default.xml"
 
     @classmethod
-    def validate(cls, name: str) -> Exception | None:
+    def validate(cls, name: str) -> Exception | Path:
         members = [member.name for member in cls]
         graph_path = Path(eval(f"cls.{name.upper()}").value)
 
@@ -175,7 +175,7 @@ class GPTSubsetter:
     """
 
     @classmethod
-    def get_subset(self, aoi: str) -> Subset:
+    def get_subset(cls, aoi: str) -> Subset:
         """
         Create a Subset from a vector file.
 
@@ -228,7 +228,7 @@ class SARPreprocessor(ABC):
     including multilook parameter estimation and graph execution.
     """
 
-    def __init__(self, SUBSET: GPTSubsetter, PROCESS: str) -> None:
+    def __init__(self, SUBSET: Subset, PROCESS: str) -> None:
         """
         Initialize the preprocessor.
 
@@ -245,7 +245,7 @@ class SARPreprocessor(ABC):
         self.SUBSET = SUBSET
         self.PROCESS = PROCESS
 
-    def estimate_multilook_parms(self, filename: str,
+    def estimate_multilook_parms(self, filename: str | Path,
                                  native_resolution: SARResolutions,
                                  n_az_looks: int = 1):
         """
@@ -300,8 +300,8 @@ class SARPreprocessor(ABC):
         else:
             raise NotImplementedError(
                 f"{native_resolution.__class__.__name__} does not exists.")
-            raise NotImplementedError(
-                f"{native_resolution.__class__.__name__} does not exists.")
+
+        assert incidence_angle is not None, f"{self.__class__.__name__}.estimate_multilook_parms: {incidence_angle = }"
 
         candidate_n = range(1, int(n_az_looks*5))
         az_rg_res = list()
