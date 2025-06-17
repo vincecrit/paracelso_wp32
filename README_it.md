@@ -15,7 +15,7 @@
 Il sottopacchetto `sensetrack.ot` fornisce le funzionalità principali per l'analisi di optical flow, la normalizzazione delle immagini, la gestione delle interfacce e la CLI per l'offset tracking. È progettato per lavorare con immagini satellitari e dati raster, offrendo algoritmi avanzati e strumenti di supporto per la ricerca e l'applicazione operativa.
 
 ### Struttura del modulo
-- `algoritmi.py`  
+- `algorithms.py`  
   Implementa le classi e le funzioni per il calcolo dell'optical flow e della cross-correlazione di fase tra immagini. Fornisce wrapper per algoritmi OpenCV e scikit-image, oltre a utilità per la conversione dei risultati in DataFrame o GeoDataFrame.
 - `cli.py`  
   Implementa la Command Line Interface per lanciare i processi di optical flow, normalizzazione e altre operazioni direttamente da terminale.
@@ -25,7 +25,7 @@ Il sottopacchetto `sensetrack.ot` fornisce le funzionalità principali per l'ana
   Definisce le classi per la rappresentazione delle immagini, la gestione delle bande e le interfacce astratte per gli algoritmi di tracking.
 - `lib.py`  
   Funzioni di supporto e utilità comuni per la manipolazione di immagini, conversioni di formato e operazioni matematiche ricorrenti.
-- `metodi.py`  
+- `methods.py`  
   Factory per la creazione di istanze degli algoritmi di optical flow. Permette di selezionare e configurare dinamicamente l'algoritmo desiderato tramite nome o parametri.
 - `opencvof.py`  
   Implementazione degli algoritmi di optical flow basati su OpenCV (es. Farneback, Lucas-Kanade). Consente la configurazione dettagliata dei parametri e l'integrazione con pipeline di elaborazione.
@@ -223,7 +223,8 @@ Il sottopacchetto `sensetrack.sentinel` fornisce strumenti e classi per il prepr
 from sensetrack.s1.preprocessing import S1Preprocessor
 
 # Crea un preprocessor specificando AOI e workflow
-preprocessor = S1Preprocessor(subset="path/to/aoi.shp", process="S1_SLC_DEFAULT") 
+preprocessor = S1Preprocessor(subset="path/to/aoi.shp",
+                              process="S1_SLC_DEFAULT")
 # Esegui il preprocessamento
 preprocessor.run("path/to/sarfile.zip")
 ```
@@ -287,7 +288,8 @@ preproc.run('path/to/file.h5', CRS="EPSG:32632")
 
 ### Esecuzione da linea di comando
 ```powershell
-python -m sensetrack.cosmo.preprocessing --product_type CSK --file path/to/file.h5 --workflow CSK_HIMAGE_SLC --aoi path/to/aoi.shp
+python -m sensetrack.cosmo.preprocessing --product_type CSK
+  --file path/to/file.h5 --workflow CSK_HIMAGE_SLC --aoi path/to/aoi.shp
 ```
 
 ### Note
