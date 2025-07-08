@@ -5,6 +5,7 @@ using the `rasterio`, `geopandas`, and `opencv` libraries.
 """
 import logging
 from pathlib import Path
+from typing import Callable
 
 import cv2
 import geopandas as gpd
@@ -285,20 +286,27 @@ def load_images(*args, nodata: float, **kwargs):
         else:
             if not reference.is_coregistered(target):
                 logger.info("Performing raster image coregistration")
-                target_coreg = basic_pixel_coregistration(str(target_file),
-                                                          str(reference_file))
-                logger.info(f"Coregistration completed successfully. " +
-                            f"Coregistered file: {target_coreg}")
-                target = Image(*rasterio_open(target_coreg, **kwargs))
+                target = basic_pixel_coregistration(str(target_file),
+                                                    str(reference_file))
             else:
                 # This never actually happens
                 logger.info("Raster images already coregistered.")
 
         return reference, target
+    
+
+def _load_as_image(func, *args, **kwargs) -> Callable:
+    def inner(*args, **kwargs):
+        output_file = func(*args, **kwargs)
+        logger.info(f"Coregistration completed successfully. " +
+                    f"Coregistered file: {output_file}")
+        return Image(*rasterio_open(output_file))
+    return inner
 
 
+@_load_as_image
 def basic_pixel_coregistration(source: str, match: str,
-                               outfile: str | Path | None = None) -> Path:
+                               outfile: str | Path | None = None):
     """
     Align pixels between a target image and a reference image.
     

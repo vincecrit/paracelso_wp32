@@ -70,7 +70,7 @@ class BaseCLI:
 
     def get_parser(self): return self.parser
 
-    def get_algorithm(self): return None
+    def get_algorithm(self) -> OTAlgorithm: ...
 
     def run(self):
 

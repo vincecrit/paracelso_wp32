@@ -34,7 +34,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 from rasterio import Affine
-from rasterio.crs import CRS
+from rasterio import CRS
 
 from sensetrack.log import setup_logger
 
@@ -81,7 +81,7 @@ class Image:
             setattr(self, bandname, band_array)
 
         self._affine = affine
-        self._crs = crs
+        self._crs = CRS.from_string(crs)
 
         if nodata is None:
             image[image < 0] = -9999.
@@ -106,7 +106,7 @@ class Image:
         obj = super().__new__(cls)
         obj.image = image
         obj.affine = affine
-        obj.crs = crs
+        obj.crs = CRS.from_string(crs)
         obj.nodata = nodata
         return obj
 
@@ -302,6 +302,8 @@ class OTAlgorithm(ABC):
     converting pixel offsets to physical displacements.
     """
 
+    library: str = 'Undefined'
+
     @classmethod
     def from_dict(cls, __d: dict):
         """
@@ -406,4 +408,4 @@ class OTAlgorithm(ABC):
 
         return np.linalg.norm([dxx, dyy], axis=0)
 
-    def __call__(self, *args, **kwargs) -> None: ...
+    def __call__(self, *args, **kwargs): ...
