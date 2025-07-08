@@ -47,29 +47,26 @@ The `sensetrack.ot` subpackage provides core functionalities for optical flow an
 
 ### Usage Example
 ```python
-from sensetrack.ot.metodi import get_algorithm
 from sensetrack.ot.interfaces import Image
 from sensetrack.lib import (rasterio_open,
                             image_to_rasterio,
                             basic_pixel_coregistration)
 from sensetrack.ot.algoritmi import OpenCVOpticalFlow
 
+# Get reference image
+ref = Image(*rasterio_open("ref.tif", band = 1), nodata = -9999.)
 # Align target image pixels with reference image
-basic_pixel_coregistration(infile = "tar.tif", match = "ref.tif",
-                           outfile = "tar_coreg.tif")
-ref = Image(**rasterio_open("ref.tif", band = 1), nodata = -9999.)
-tar = Image(**rasterio_open("tar_coreg.tif", band = 1), nodata = -9999.)
+tar = basic_pixel_coregistration(infile = "tar.tif", match = "ref.tif")
 # Optical flow (Gunnar Farneback)
 OT = OpenCVOpticalFlow.from_dict({"pyr_scale":0.5, "levels":4, "winsize":16})
-result = OT(reference=ref.get_band("B1"), target=tar.get_band("B1"))
+result = OT(reference=ref, target=tar)
 image_to_rasterio(result, "output.tif")
 ```
 
 ### CLI
-To launch the same analysis from terminal (coregistration is still performed):
+To launch the same analysis from terminal (coregistration is performed by default):
 ```powershell
-python -m sensetrack.ot.cli --algname OPENCVOF
-  --reference ref.tif --target tar.tif 
+python -m sensetrack.ot.opencvof --reference ref.tif --target tar.tif 
   --output output.tif --winsize 16 --levels 4
 ```
 
@@ -120,7 +117,7 @@ The `sensetrack.snap_gpt` subpackage provides tools and workflows for SAR (Synth
 ### Main Features
 - **SNAP-GPT workflow management**: automates the creation and execution of SNAP graphs for SAR preprocessing (e.g., Sentinel-1, COSMO-SkyMed).
 - **Flexible configuration**: parameters, paths, and AOIs are managed through YAML and GeoPackage files.
-- **Multi-sensor support**: predefined workflows for different sensors (S1, COSMO, S2) via XML graph files.
+- **Multi-platform support**: predefined workflows for different platforms (Sentinel-1/2, COSMO-SkyMed) via XML graph files.
 - **Batch processing**: execution of processes on multiple SAR files automatically and repeatably.
 - **AOI management**: selection and application of areas of interest for image subsetting.
 - **Logging and error handling**: SNAP-GPT log parsing, exception handling, and reporting.
@@ -200,7 +197,7 @@ Below is a summary of the main nodes present in the XML workflows provided with 
 ## Sentinel-1 SAR Preprocessing Submodule (sentinel)
 
 ### Overview
-The `sensetrack.sentinel` subpackage provides tools and classes for preprocessing SAR data from the Sentinel-1 satellite. It enables automated management of processing workflows, manifest reading and manipulation, and integration with broader analysis pipelines.
+The `sensetrack.sentinel` subpackage provides tools and classes for preprocessing SAR data from Sentinel-1 mission. It enables automated management of processing workflows, manifest reading and manipulation, and integration with broader analysis pipelines.
 
 ### Module Structure
 - `preprocessing.py`
@@ -222,10 +219,13 @@ The `sensetrack.sentinel` subpackage provides tools and classes for preprocessin
 ### Usage Example
 ```python
 from sensetrack.s1.preprocessing import S1Preprocessor
+from sensetrack.snap_gpt.lib import GPTSubsetter
+
+aoi = GPTSubsetter.get_subset("path/to/aoi.shp")
 
 # Create a preprocessor specifying AOI and workflow
-preprocessor = S1Preprocessor(subset="path/to/aoi.shp",
-                              process="S1_SLC_DEFAULT") 
+preprocessor = S1Preprocessor(subset=aoi, process="S1_SLC_DEFAULT") 
+
 # Execute preprocessing
 preprocessor.run("path/to/sarfile.zip")
 ```
@@ -306,7 +306,7 @@ python -m sensetrack.cosmo.preprocessing --product_type CSK
 The `sensetrack.prisma` subpackage provides tools for converting PRISMA data, facilitating integration with GIS software and analysis pipelines.
 
 ### Module Structure
-- `convert.py`
+- `extract.py`
   - Functions for:
     - Reading PRISMA HDF5 files.
     - Extracting product metadata and information (`get_prisma_info`).
@@ -324,13 +324,19 @@ The `sensetrack.prisma` subpackage provides tools for converting PRISMA data, fa
 ### Usage Example
 #### From Python
 ```python
-from sensetrack.prs.convert import get_prisma_info, get_prisma_image
+from sensetrack.ot.lib import image_to_rasterio
+from sensetrack.prs.extract import get_prisma_info, get_prisma_image
 
 # Extract info from a PRISMA file
 get_prisma_info('path/to/file.h5')
 
 # Convert SWIR band to GeoTIFF
-get_prisma_image('path/to/file.h5', datacube='swir', band=23)
+swir_23 = get_prisma_image('path/to/file.h5', datacube='swir', band=23)
+image_to_rasterio(swir_23, "swir_23.tif")
+
+# Convert PAN band to GeoTIFF
+pan = get_prisma_image('path/to/file.h5', datacube='pan')
+image_to_rasterio(pan, "pan.tif")
 ```
 
 #### From Terminal
