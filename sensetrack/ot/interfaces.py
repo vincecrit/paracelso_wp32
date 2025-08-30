@@ -81,7 +81,7 @@ class Image:
             setattr(self, bandname, band_array)
 
         self._affine = affine
-        self._crs = CRS.from_string(crs)
+        self._crs = crs
 
         if nodata is None:
             image[image < 0] = -9999.

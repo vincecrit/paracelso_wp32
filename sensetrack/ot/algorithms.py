@@ -259,6 +259,8 @@ class OpenCVOpticalFlow(OTAlgorithm):
                                                      poly_sigma=self.poly_sigma,
                                                      flags=self.flags) # type: ignore
 
+        setattr(self, "pixel_offsets", pixel_offsets)
+
         displ = self._to_displacements(target.affine, pixel_offsets)
 
         logger.debug(f"Tipo output: {displ.dtype}")
