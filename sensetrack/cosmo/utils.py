@@ -4,6 +4,7 @@ This module provides utility classes and functions for
 string manipulation within the sensetrack.cosmo package.
 """
 import math
+import statistics
 from pathlib import Path
 
 import geopandas as gpd
@@ -64,17 +65,21 @@ def csk_footprint(h5_file):
 
 def csk_shape(h5_file):
     with h5py.File(h5_file, "r") as f:
-        SBI = f['/S01/SBI'][()]
-
-    return SBI.shape
+        SBI = f['/S01/SBI']
+        if isinstance(SBI, h5py.Dataset):
+            return SBI.shape
+        else:
+            raise TypeError("'/S01/SBI' is not a dataset")
 
 
 def csg_shape(h5_file):
     with h5py.File(h5_file, "r") as f:
-        IMG = f['/S01/IMG'][()]
-
-    return IMG.shape
-
+        IMG = f['/S01/IMG']
+        if isinstance(IMG, h5py.Dataset):
+            return IMG.shape
+        else:
+            raise TypeError("'/S01/IMG' is not a dataset")
+        
 
 def csk_mean_incidence_angle_rad(h5_file) -> float | None:
     with h5py.File(h5_file, "r") as f:
@@ -84,7 +89,7 @@ def csk_mean_incidence_angle_rad(h5_file) -> float | None:
         near_iangle = attrs.get('Near Incidence Angle', None)
 
         if far_iangle and near_iangle:
-            return ((far_iangle + near_iangle) / 2 * math.pi) / 180.
+            return statistics.mean([far_iangle, near_iangle]) * (math.pi/180.)
         else:
             return
 
@@ -97,7 +102,7 @@ def csg_mean_incidence_angle_rad(h5_file) -> float | None:
         near_iangle = attrs.get('Near Incidence Angle', None)
 
         if far_iangle and near_iangle:
-            return ((far_iangle + near_iangle) / 2 * math.pi) / 180.
+            return statistics.mean([far_iangle, near_iangle]) * (math.pi/180.)
         else:
             return
 
