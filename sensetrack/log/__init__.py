@@ -16,7 +16,7 @@ LOG_FORMAT = "%(asctime)s [%(name)s.%(funcName)s - %(lineno)s][%(levelname)s] - 
 LOG_LEVEL = logging.DEBUG
 
 
-def setup_logger(name: str):
+def setup_logger(name: str, LOG_LEVEL: int = LOG_LEVEL):
     logger = logging.getLogger(name)
     logger.setLevel(LOG_LEVEL)
     logger.propagate = False  # Evita la propagazione ai logger superiori

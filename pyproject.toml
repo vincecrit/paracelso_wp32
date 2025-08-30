@@ -7,7 +7,7 @@ authors = [
 maintainers = [
     { name = "Vincenzo Critelli", email = "vince.crit@gmail.com" }
 ]
-version = "1.0"
+version = "1.01"
 dependencies = [
     "numpy>=1.23",
     "pandas>=1.5",
@@ -28,7 +28,7 @@ classifiers = [
     "Development Status :: 4 - Beta",
     "Programming Language :: Python"
 ]
-license-files = ["LICENSE"]
+license-files = ["LICENCE"]
 
 [build-system]
 requires = ["setuptools>=61", "wheel"]

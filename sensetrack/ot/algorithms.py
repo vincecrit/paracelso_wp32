@@ -15,7 +15,6 @@ Functions:
     - stepped_rolling_window: Generates sliding windows over a 2D array.
     - xcorr_to_frame: Performs image cross-correlation and returns results as a GeoDataFrame or DataFrame.
 """
-from enum import Enum, unique
 
 import cv2
 import geopandas as gpd
@@ -34,7 +33,7 @@ from sensetrack.ot.interfaces import Image, OTAlgorithm
 logger = setup_logger(__name__)
 
 
-def stepped_rolling_window(array_2d: np.ndarray, window_shape: tuple[int], step: int):
+def stepped_rolling_window(array_2d: np.ndarray, window_shape: tuple[int, int], step: int):
     """
     Returns the sliding windows of the input array using the
     `skimage.utils.view_as_windows` function and the indices corresponding to
@@ -66,13 +65,12 @@ def stepped_rolling_window(array_2d: np.ndarray, window_shape: tuple[int], step:
     return windows.reshape(-1, *window_shape), np.array(centers)
 
 
-# non so dove metterla
 def xcorr_to_frame(ref: Image, tar: Image,
-                   win_size: tuple[int] | int,
+                   win_size: tuple[int, int] | int,
                    step_size: int,
-                   normalization: str | None = 'phase',
+                   normalization: str = 'phase',
                    disambiguate=True,
-                   upsample_factor: int | float = 1.0) -> gpd.GeoDataFrame | pd.DataFrame:
+                   upsample_factor: int = 1) -> gpd.GeoDataFrame | pd.DataFrame:
     """
     Image cross-correlation. By default, images are normalized
     using FFT, thus performing phase cross-correlation (PCC);
@@ -157,8 +155,7 @@ def xcorr_to_frame(ref: Image, tar: Image,
         return df
 
 
-@unique
-class OPTFLOW_Flags(Enum):
+class OPTFLOW_Flags:
     """Flags for OpenCV optical flow."""
     OPTFLOW_DEFAULT = None
     OPTFLOW_USE_INITIAL_FLOW = 4  # cv2.OPTFLOW_USE_INITIAL_FLOW
@@ -215,10 +212,10 @@ class OpenCVOpticalFlow(OTAlgorithm):
 
     library = 'OpenCV'
 
-    def __init__(self, flow: np.ndarray = None,
+    def __init__(self, flow: np.ndarray | None = None,
                  pyr_scale: float = 0.5, levels: int = 4, winsize: int = 16,
                  iterations: int = 5, poly_n: int = 5, poly_sigma: float = 1.1,
-                 flags: int = OPTFLOW_Flags.OPTFLOW_DEFAULT) -> None:
+                 flags: int | None = OPTFLOW_Flags.OPTFLOW_DEFAULT) -> None:
 
         self.flow = flow
         self.pyr_scale = pyr_scale
@@ -227,11 +224,7 @@ class OpenCVOpticalFlow(OTAlgorithm):
         self.iterations = iterations
         self.poly_n = poly_n
         self.poly_sigma = poly_sigma
-        try:
-            self.flags = flags.value
-        except AttributeError:
-            self.flags = flags\
-
+        self.flags = flags
 
     def __call__(self, reference: Image, target: Image) -> Image:
         """
@@ -257,14 +250,14 @@ class OpenCVOpticalFlow(OTAlgorithm):
         logger.debug(f"{target.shape=}, {target.image.dtype=}")
 
         pixel_offsets = cv2.calcOpticalFlowFarneback(prev=reference.image, next=target.image,
-                                                     flow=self.flow,
+                                                     flow=self.flow, # type: ignore
                                                      pyr_scale=self.pyr_scale,
                                                      levels=self.levels,
                                                      winsize=self.winsize,
                                                      iterations=self.iterations,
                                                      poly_n=self.poly_n,
                                                      poly_sigma=self.poly_sigma,
-                                                     flags=self.flags)
+                                                     flags=self.flags) # type: ignore
 
         displ = self._to_displacements(target.affine, pixel_offsets)
 
@@ -412,10 +405,10 @@ class SkiPCC_Vector(OTAlgorithm):
 
     library = 'skimage'
 
-    def __init__(self, winsize: tuple[int] | int,
-                 step_size: tuple[int] | int,
+    def __init__(self, winsize: tuple[int, int] | int,
+                 step_size: int,
                  phase_norm: bool = True,
-                 upsmp_fac: int | float = 1.0):
+                 upsmp_fac: int = 1):
 
         if phase_norm:
             self.normalization = 'phase'
@@ -433,5 +426,5 @@ class SkiPCC_Vector(OTAlgorithm):
         return xcorr_to_frame(ref=reference, tar=target,
                               win_size=self.winsize,
                               step_size=self.step_size,
-                              normalization=self.normalization,
+                              normalization=self.normalization, # type: ignore (type-linting is missing in `phase_cross_correlation` for `None`)
                               upsample_factor=self.upsmp_fac)

@@ -15,7 +15,7 @@
 Il sottopacchetto `sensetrack.ot` fornisce le funzionalità principali per l'analisi di optical flow, la normalizzazione delle immagini, la gestione delle interfacce e la CLI per l'offset tracking. È progettato per lavorare con immagini satellitari e dati raster, offrendo algoritmi avanzati e strumenti di supporto per la ricerca e l'applicazione operativa.
 
 ### Struttura del modulo
-- `algoritmi.py`  
+- `algorithms.py`  
   Implementa le classi e le funzioni per il calcolo dell'optical flow e della cross-correlazione di fase tra immagini. Fornisce wrapper per algoritmi OpenCV e scikit-image, oltre a utilità per la conversione dei risultati in DataFrame o GeoDataFrame.
 - `cli.py`  
   Implementa la Command Line Interface per lanciare i processi di optical flow, normalizzazione e altre operazioni direttamente da terminale.
@@ -25,7 +25,7 @@ Il sottopacchetto `sensetrack.ot` fornisce le funzionalità principali per l'ana
   Definisce le classi per la rappresentazione delle immagini, la gestione delle bande e le interfacce astratte per gli algoritmi di tracking.
 - `lib.py`  
   Funzioni di supporto e utilità comuni per la manipolazione di immagini, conversioni di formato e operazioni matematiche ricorrenti.
-- `metodi.py`  
+- `methods.py`  
   Factory per la creazione di istanze degli algoritmi di optical flow. Permette di selezionare e configurare dinamicamente l'algoritmo desiderato tramite nome o parametri.
 - `opencvof.py`  
   Implementazione degli algoritmi di optical flow basati su OpenCV (es. Farneback, Lucas-Kanade). Consente la configurazione dettagliata dei parametri e l'integrazione con pipeline di elaborazione.
@@ -184,9 +184,9 @@ Di seguito una sintesi dei principali nodi presenti nei workflow XML forniti con
 #### `cosmo_scs-b_default.xml`
 - **Read**: Lettura prodotto Cosmo-SkyMed.
 - **LinearToFromdB**: Conversione tra scala lineare e dB.
-- **Multilook**: Riduzione risoluzione.
+- **Multilook**: Riduzione risoluzione (parametri stimati automaticamente)
 - **Terrain-Correction**: Ortorettifica.
-- **Subset**: Estrazione AOI.
+- **Subset**: Estrazione AOI con riproiezione opzionale
 - **Write**: Output finale.
 
 ### Note
@@ -220,13 +220,13 @@ Il sottopacchetto `sensetrack.sentinel` fornisce strumenti e classi per il prepr
 
 ### Esempio di utilizzo
 ```python
-import geopandas as gpd
 from sensetrack.s1.preprocessing import S1Preprocessor
-# Carica un ESRI shapefile poligonale per la definizione dell'area di interesse (AOI)
-aoi = gpd.read_file("./aoi.shp")
-# Crea un preprocessor per una specifica AOI e processo
-preproc = S1Preprocessor(aoi=aoi, process="S1_SLC_DEFAULT")
-preproc.run("path/to/sarfile.zip")
+
+# Crea un preprocessor specificando AOI e workflow
+preprocessor = S1Preprocessor(subset="path/to/aoi.shp",
+                              process="S1_SLC_DEFAULT")
+# Esegui il preprocessamento
+preprocessor.run("path/to/sarfile.zip")
 ```
 
 ### Note
@@ -288,7 +288,8 @@ preproc.run('path/to/file.h5', CRS="EPSG:32632")
 
 ### Esecuzione da linea di comando
 ```powershell
-python -m sensetrack.cosmo.preprocessing --product_type CSK --file path/to/file.h5 --workflow CSK_HIMAGE_SLC --aoi path/to/aoi.shp
+python -m sensetrack.cosmo.preprocessing --product_type CSK
+  --file path/to/file.h5 --workflow CSK_HIMAGE_SLC --aoi path/to/aoi.shp
 ```
 
 ### Note
@@ -301,37 +302,40 @@ python -m sensetrack.cosmo.preprocessing --product_type CSK --file path/to/file.
 ## PRISMA Post-Processing and Conversion Submodule (prisma)
 
 ### Overview
-Il sottopacchetto `sensetrack.prs` fornisce strumenti per la conversione di dati PRISMA, facilitando l'integrazione con software GIS e pipeline di analisi.
+Il sottopacchetto `sensetrack.prisma` fornisce strumenti per la conversione di dati PRISMA, facilitando l'integrazione con software GIS e pipeline di analisi.
 
 ### Struttura del modulo
 - `convert.py`
   - Funzioni per:
     - Lettura di file HDF5 PRISMA.
     - Estrazione di metadati e informazioni di prodotto (`get_prisma_info`).
-    - Conversione di bande PRISMA (pan, swir, vnir) in GeoTIFF georeferenziati (`prisma_panchromatic_to_gtiff`).
-    - Parsing degli argomenti da linea di comando per conversione e info.
+    - Estrazione di bande PRISMA (pan, swir, vnir) in oggetti `Image` (`get_prisma_image`).
+    - Parsing degli argomenti da linea di comando per conversione in formato GeoTiff ed estrazione di informazioni.
 
 ### Funzionalità principali
-- **Estrazione metadati PRISMA**: stampa informazioni chiave (ID prodotto, livello di processing, percentuale nuvolosità, EPSG) da file HDF5 PRISMA.
+- **Supporto multi-banda**: elaborazione di bande pan, SWIR e VNIR
+- **Georeferenziazione**: mantenimento delle informazioni spaziali
+- **Batch processing**: elaborazione di più file PRISMA
+- **Estrazione metadati PRISMA**: stampa informazioni chiave (ID prodotto, livello di processing, percentuale nuvolosità, EPSG, dati di ampiezza di banda) da file HDF5 PRISMA.
 - **Conversione a GeoTIFF**: esporta bande panchromatiche, SWIR e VNIR da HDF5 PRISMA a file GeoTIFF georeferenziati, mantenendo proiezione e bounding box.
 - **CLI**: permette di lanciare conversioni e info direttamente da terminale con opzioni dedicate.
 
 ### Esempio di utilizzo
 #### Da Python
 ```python
-from sensetrack.prs.convert import get_prisma_info, prisma_panchromatic_to_gtiff
+from sensetrack.prs.convert import get_prisma_info, get_prisma_image
 
 # Estrai info da un file PRISMA
 get_prisma_info('path/to/file.h5')
 
 # Converte la banda SWIR in GeoTIFF
-prisma_panchromatic_to_gtiff('path/to/file.h5', band='swir')
+get_prisma_image('path/to/file.h5', datacube='swir', band=23)
 ```
 
 #### Da terminale
 ```powershell
-python sensetrack/prs/convert.py -f path/to/file.h5 --convert
-python sensetrack/prs/convert.py -f path/to/file.h5 --show_info
+python sensetrack/prs/convert.py -f path/to/file.h5 --datacube vnir --band 34
+python sensetrack/prs/convert.py -f path/to/file.h5 --datacube swir --band 125
 ```
 
 ### Note
