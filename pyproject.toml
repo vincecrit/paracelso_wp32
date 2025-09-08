@@ -7,7 +7,7 @@ authors = [
 maintainers = [
     { name = "Vincenzo Critelli", email = "vince.crit@gmail.com" }
 ]
-version = "1.01"
+version = "1.3"
 dependencies = [
     "numpy>=1.23",
     "pandas>=1.5",
@@ -36,6 +36,7 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 include = ["sensetrack*", "sensetrack/graphs/*.xml"]
+where = ["."]
 
 [tool.setuptools.package-data]
 "sensetrack.graphs" = ["*.xml"]

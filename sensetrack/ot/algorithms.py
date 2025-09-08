@@ -117,7 +117,7 @@ def xcorr_to_frame(ref: Image, tar: Image,
     if ref.crs is None:
         CRS = None
     else:
-        CRS = ref.crs.to_string()
+        CRS = ref.crs
 
     if isinstance(win_size, int):
         win_size = win_size, win_size
@@ -133,7 +133,7 @@ def xcorr_to_frame(ref: Image, tar: Image,
                                                      upsample_factor=upsample_factor,
                                                      disambiguate=disambiguate)
 
-        L2 = np.sqrt(sr**2 + sc**2)  # risultante dello spostamento
+        L2 = np.sqrt(sr**2 + sc**2)
         row = L2, float(sr), float(sc), float(error)
         offset_record.append(row)
 
@@ -316,6 +316,7 @@ class SkiOpticalFlowILK(OTAlgorithm):
         logger.debug(f"Shape output: {[e.shape for e in pixel_offsets]}")
 
         a, b = pixel_offsets
+        setattr(self, "pixel_offsets", pixel_offsets)
         displ = self._to_displacements(target.affine, cv2.merge([a, b]))
 
         return Image(displ, target.affine, target.crs, target.nodata)

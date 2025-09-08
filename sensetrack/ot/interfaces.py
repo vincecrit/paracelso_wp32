@@ -86,7 +86,7 @@ class Image:
         if nodata is None:
             image[image < 0] = -9999.
             self._nodata = -9999.9
-            logger.debug(f"Inferring/setting nodata values: {nodata = :.1f}")
+            logger.debug(f"Inferring/setting nodata values: {self._nodata = :.1f}")
         else:
             self._nodata = nodata
 
@@ -106,7 +106,7 @@ class Image:
         obj = super().__new__(cls)
         obj.image = image
         obj.affine = affine
-        obj.crs = CRS.from_string(crs)
+        obj.crs = crs
         obj.nodata = nodata
         return obj
 
