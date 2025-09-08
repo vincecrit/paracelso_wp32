@@ -1,44 +1,37 @@
-'''
+"""
 Help strings for parser function
-'''
+"""
 
-ALGNAME = '''Algoritmo da impiegare'''
-REFERENCE = '''Immagine di reference'''
-TARGET = '''Immagine target'''
-OUTPUT = '''Output file'''
-NODATA = '''Valore di nodata'''
-BAND = '''Banda da utilizzare, Se non indicata verranno utilizzate tutte le
-disponibili.'''
-RGB2GRAY = '''Converte le immagini RGB in scala di grigi (banda singola)'''
-LOGNORM = '''Normalizza i logaritmi delle immagini. Ha la precedenza su
-'--normalize' e '--powernorm'''
-MINMAX = '''Normalizza le singole bande nel range 0 - 1 rispetto ai valori minimo e massimo'''
-CLAHE = '''Normalizza le singole bande attraverso un algoritmo CLAHE (Contrast Limited Adaptive Histogram Equalization)'''
-NORMALIZE = '''Normalizza le immagini rispetto ai valori minimi e massimi'''
-ZSCORENORM = '''Normalizza le immagini con potenza. Indica il parametro gamma'''
-FLOW = '''Guess iniziale di flusso. Richiede l'argomento '--flags' impostato
-su 4'''
-LEVELS = '''Numero di piramidi'''
-PYR_SCALE = '''Specifica il rapporto di scala da utilizzare tra un livello di
- piramidi e un altro.'''
-WINSIZE = '''Dimensione finestra mobile'''
-STEPSIZE = '''intervallo di campionamento. L'immagine verrà scomposta in tante
- finestre mobili centrate su punti dell'immagine distanziati di `step_size` pixels.'''
-ITERATIONS = '''Numero di iterazioni'''
-POLY_N = '''Numero di pixel da usare per l'espansione pol'''
-POLY_SIGMA = '''Deviazione standard della guassiana usata per smussare le
-derivate per l'espansione polinomiale.'''
-FLAGS = '''Operazioni opzionali: '--flags 4' per utilizzare flusso iniziale
-(vedi --flow)\n'--flags 256' imposta un filtro gaussiano al posto di una box'''
-RADIUS = '''Dimensione finestra mobile'''
-NUMWARP = '''Numero di iterazioni per il warp'''
-GAUSSIAN = '''Applica un filtro gaussiano all'immagine di output'''
-PREFILTER = '''Applica un filtro di pre-filtraggio all'immagine di output'''
-ATTACHMENT = '''Smussa il risultato finale quanto è piu' piccolo in valore'''
-TIGHTNESS = '''Determina il valore di tightness'''
-NUMITER = '''Numero fisso di iterazioni'''
-TOL = '''Tolleranza per la convergenza'''
-PHASENORM = '''Tipo di normalizzazione nella cross-correlazione. Se `True` applica
-una normalizzazione FFT alle finestre mobili'''
-UPSAMPLE_FACTOR = '''Utile per identificare spostamenti a scala di sub-pixel.
-Influenza molto il carico di calcolo necessario.'''
+ALGNAME = """Algorithm to use"""
+REFERENCE = """Reference image"""
+TARGET = """Target image"""
+OUTPUT = """Output file"""
+NODATA = """Nodata value"""
+BAND = """Band to use. If not specified, all available bands will be used."""
+RGB2GRAY = """Convert RGB images to grayscale (single band)"""
+LOGNORM = """Normalize the logarithms of the images. Takes precedence over '--normalize' and '--powernorm"""
+MINMAX = """Normalize each band in the range 0 - 1 with respect to the minimum and maximum values"""
+CLAHE = """Normalize each band using a CLAHE algorithm (Contrast Limited Adaptive Histogram Equalization)"""
+NORMALIZE = """Normalize images with respect to minimum and maximum values"""
+ZSCORENORM = """Normalize images with power. Indicates the gamma parameter"""
+FLOW = """Initial flow guess. Requires the '--flags' argument set to 4"""
+LEVELS = """Number of pyramids"""
+PYR_SCALE = (
+    """Specifies the scale ratio to use between one pyramid level and another."""
+)
+WINSIZE = """Moving window size"""
+STEPSIZE = """Sampling interval. The image will be decomposed into many moving windows centered on image points spaced by `step_size` pixels."""
+ITERATIONS = """Number of iterations"""
+POLY_N = """Number of pixels to use for polynomial expansion"""
+POLY_SIGMA = """Standard deviation of the Gaussian used to smooth the derivatives for polynomial expansion."""
+FLAGS = """Optional operations: '--flags 4' to use initial flow (see --flow)\n'--flags 256' sets a Gaussian filter instead of a box filter"""
+RADIUS = """Moving window size"""
+NUMWARP = """Number of iterations for the warp"""
+GAUSSIAN = """Apply a Gaussian filter to the output image"""
+PREFILTER = """Apply a pre-filter to the output image"""
+ATTACHMENT = """Smooth the final result when it is smaller in value"""
+TIGHTNESS = """Determines the tightness value"""
+NUMITER = """Fixed number of iterations"""
+TOL = """Tolerance for convergence"""
+PHASENORM = """Type of normalization in cross-correlation. If `True`, applies FFT normalization to the moving windows"""
+UPSAMPLE_FACTOR = """Useful for identifying sub-pixel scale shifts. Strongly affects the required computational load."""

@@ -36,6 +36,7 @@ Typical workflow:
     4. Run the selected offset-tracking algorithm.
     5. Export the displacement results to the specified output file.
 """
+
 import argparse
 from pathlib import Path
 
@@ -51,24 +52,26 @@ logger = setup_logger(__name__)
 class BaseCLI:
     def __init__(self, method: OTAlgorithm | None = None):
         self.parser = argparse.ArgumentParser(
-            description="Offset-Tracking PARACELSO WP3.2")
+            description="Offset-Tracking PARACELSO WP3.2"
+        )
         self.add_common_args()
 
     def add_common_args(self):
         self.parser.add_argument(
-            "-r", "--reference", required=True, help=REFERENCE, type=str)
+            "-r", "--reference", required=True, help=REFERENCE, type=str
+        )
+        self.parser.add_argument("-t", "--target", required=True, help=TARGET, type=str)
         self.parser.add_argument(
-            "-t", "--target", required=True, help=TARGET, type=str)
+            "-o", "--output", help=OUTPUT, default="output.tif", type=str
+        )
+        self.parser.add_argument("-b", "--band", help=BAND, default=None, type=int)
+        self.parser.add_argument("--nodata", help=NODATA, default=None, type=float)
         self.parser.add_argument(
-            "-o", "--output", help=OUTPUT, default="output.tif", type=str)
-        self.parser.add_argument(
-            "-b", "--band", help=BAND, default=None, type=int)
-        self.parser.add_argument(
-            "--nodata", help=NODATA, default=None, type=float)
-        self.parser.add_argument(
-            "-prep", "--preprocessing", default='equalize', type=str)
+            "-prep", "--preprocessing", default="equalize", type=str
+        )
 
-    def get_parser(self): return self.parser
+    def get_parser(self):
+        return self.parser
 
     def get_algorithm(self) -> OTAlgorithm: ...
 
@@ -79,17 +82,19 @@ class BaseCLI:
         algorithm = self.get_algorithm(**vars(args))
 
         reference, target = lib.load_images(
-            args.reference, args.target, band=args.band, nodata=args.nodata)
+            args.reference, args.target, band=args.band, nodata=args.nodata
+        )
 
         preprocessed_images = [
             dispatcher.dispatcher.dispatch_process(
-                f"{algorithm.library}_{args.preprocessing}", array=img)
-            for img in (reference, target)]
+                f"{algorithm.library}_{args.preprocessing}", array=img
+            )
+            for img in (reference, target)
+        ]
 
-        logger.info(f"{args.preprocessing.upper()} eseguito correttamente.")
+        logger.info(f"{args.preprocessing.upper()} successfully completed.")
         displacements = algorithm(*preprocessed_images)
-        logger.info(
-            f"Algoritmo {algorithm.__class__.__name__} eseguito correttamente")
+        logger.info(f"Algoritmo {algorithm.__class__.__name__} successfully completed")
 
-        logger.info(f"Esporto su file: {args.output}")
+        logger.info(f"Export to file: {args.output}")
         lib.write_output(displacements, args.output)
