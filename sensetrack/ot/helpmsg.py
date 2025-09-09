@@ -14,6 +14,7 @@ MINMAX = """Normalize each band in the range 0 - 1 with respect to the minimum a
 CLAHE = """Normalize each band using a CLAHE algorithm (Contrast Limited Adaptive Histogram Equalization)"""
 NORMALIZE = """Normalize images with respect to minimum and maximum values"""
 ZSCORENORM = """Normalize images with power. Indicates the gamma parameter"""
+RES = """Whether or not to export resultant displacement output. Ignored if output is vector-like"""
 FLOW = """Initial flow guess. Requires the '--flags' argument set to 4"""
 LEVELS = """Number of pyramids"""
 PYR_SCALE = (

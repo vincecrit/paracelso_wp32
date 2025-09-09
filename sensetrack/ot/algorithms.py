@@ -15,6 +15,7 @@ Functions:
     - stepped_rolling_window: Generates sliding windows over a 2D array.
     - xcorr_to_frame: Performs image cross-correlation and returns results as a GeoDataFrame or DataFrame.
 """
+from dataclasses import dataclass
 
 import cv2
 import geopandas as gpd
@@ -31,6 +32,10 @@ from sensetrack.log import setup_logger
 from sensetrack.ot.interfaces import Image, OTAlgorithm
 
 logger = setup_logger(__name__)
+
+
+def normL2(a1, a2):
+    return np.linalg.norm([a1, a2], axis=0)
 
 
 def stepped_rolling_window(array_2d: np.ndarray, window_shape: tuple[int, int], step: int):
@@ -153,6 +158,13 @@ def xcorr_to_frame(ref: Image, tar: Image,
         df.insert(0, 'Y', y)
         df.insert(0, 'X', x)
         return df
+    
+
+@dataclass
+class RasterOutput:
+    dxx: Image
+    dyy: Image
+    res: Image
 
 
 class OPTFLOW_Flags:
@@ -226,7 +238,7 @@ class OpenCVOpticalFlow(OTAlgorithm):
         self.poly_sigma = poly_sigma
         self.flags = flags
 
-    def __call__(self, reference: Image, target: Image) -> Image:
+    def __call__(self, reference: Image, target: Image) -> dict:
         """
         Computes the optical flow between a reference and a target image using the Farneback algorithm.
         
@@ -259,14 +271,13 @@ class OpenCVOpticalFlow(OTAlgorithm):
                                                      poly_sigma=self.poly_sigma,
                                                      flags=self.flags) # type: ignore
 
-        setattr(self, "pixel_offsets", pixel_offsets)
+        dxx, dyy = self._to_displacements(target.affine, pixel_offsets)
 
-        displ = self._to_displacements(target.affine, pixel_offsets)
+        dxx_img = Image(dxx, target.affine, target.crs, target.nodata)
+        dyy_img = Image(dyy, target.affine, target.crs, target.nodata)
+        res = Image(normL2(dxx, dyy), target.affine, target.crs, target.nodata)
 
-        logger.debug(f"Tipo output: {displ.dtype}")
-        logger.debug(f"Shape output: {displ.shape}")
-
-        return Image(displ, target.affine, target.crs, target.nodata)
+        return dict(dxx=dxx_img, dyy=dyy_img, res=res)
 
 
 class SkiOpticalFlowILK(OTAlgorithm):
@@ -299,7 +310,7 @@ class SkiOpticalFlowILK(OTAlgorithm):
         self.gaussian = gaussian
         self.prefilter = prefilter
 
-    def __call__(self, reference: Image, target: Image) -> Image:
+    def __call__(self, reference: Image, target: Image) -> dict:
         """
         Calculate optical flow between reference and target images using ILK method.
         """
@@ -316,10 +327,13 @@ class SkiOpticalFlowILK(OTAlgorithm):
         logger.debug(f"Shape output: {[e.shape for e in pixel_offsets]}")
 
         a, b = pixel_offsets
-        setattr(self, "pixel_offsets", pixel_offsets)
-        displ = self._to_displacements(target.affine, cv2.merge([a, b]))
+        dxx, dyy = self._to_displacements(target.affine, cv2.merge([a, b]))
 
-        return Image(displ, target.affine, target.crs, target.nodata)
+        dxx_img = Image(dxx, target.affine, target.crs, target.nodata)
+        dyy_img = Image(dyy, target.affine, target.crs, target.nodata)
+        res = Image(normL2(dxx, dyy), target.affine, target.crs, target.nodata)
+
+        return dict(dxx=dxx_img, dyy=dyy_img, res=res)
 
 
 class SkiOpticalFlowTVL1(OTAlgorithm):
@@ -354,7 +368,7 @@ class SkiOpticalFlowTVL1(OTAlgorithm):
         self.tol = tol
         self.prefilter = prefilter
 
-    def __call__(self, reference: Image, target: Image) -> Image:
+    def __call__(self, reference: Image, target: Image) -> dict:
         """
         Calculate optical flow between reference and target images using TVL1 method.
         """
@@ -376,9 +390,13 @@ class SkiOpticalFlowTVL1(OTAlgorithm):
         logger.debug(f"Shape output: {[e.shape for e in pixel_offsets]}")
 
         a, b = pixel_offsets
-        displ = self._to_displacements(target.affine, cv2.merge([a, b]))
+        dxx, dyy = self._to_displacements(target.affine, cv2.merge([a, b]))
 
-        return Image(displ, target.affine, target.crs, target.nodata)
+        dxx_img = Image(dxx, target.affine, target.crs, target.nodata)
+        dyy_img = Image(dyy, target.affine, target.crs, target.nodata)
+        res = Image(normL2(dxx, dyy), target.affine, target.crs, target.nodata)
+
+        return dict(dxx=dxx_img, dyy=dyy_img, res=res)
 
 
 class SkiPCC_Vector(OTAlgorithm):

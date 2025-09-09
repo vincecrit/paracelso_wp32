@@ -17,6 +17,8 @@ Arguments:
     -b, --band          Band index to process (optional).
     --nodata            Value to use for nodata pixels (optional).
     -prep, --preprocessing  Preprocessing method to apply (default: "equalize").
+    --resultant_displacement Whether or not to export resultant displacement.
+    If `False` exports two images for x and y displacements. Ignored for SKIPCCV output. Defaluts to `True`
 
 Dependencies:
 
@@ -42,7 +44,7 @@ from pathlib import Path
 
 from sensetrack.log import setup_logger
 from sensetrack.ot import lib
-from sensetrack.ot.helpmsg import BAND, NODATA, OUTPUT, REFERENCE, TARGET
+from sensetrack.ot.helpmsg import BAND, NODATA, OUTPUT, REFERENCE, TARGET, RES
 from sensetrack.ot.image_processing import dispatcher
 from sensetrack.ot.interfaces import OTAlgorithm
 
@@ -66,6 +68,7 @@ class BaseCLI:
         )
         self.parser.add_argument("-b", "--band", help=BAND, default=None, type=int)
         self.parser.add_argument("--nodata", help=NODATA, default=None, type=float)
+        self.parser.add_argument("--resultant_displacement", help=RES, default=True, type=bool)
         self.parser.add_argument(
             "-prep", "--preprocessing", default="equalize", type=str
         )
@@ -93,8 +96,23 @@ class BaseCLI:
         ]
 
         logger.info(f"{args.preprocessing.upper()} successfully completed.")
-        displacements = algorithm(*preprocessed_images)
-        logger.info(f"Algoritmo {algorithm.__class__.__name__} successfully completed")
+        output = algorithm(*preprocessed_images)
+        logger.info(f"Algorithm {algorithm.__class__.__name__} successfully completed")
 
-        logger.info(f"Export to file: {args.output}")
-        lib.write_output(displacements, args.output)
+        if isinstance(output, dict):
+            if args.resultant_displacement: # export resultant displacements
+                logger.info(f"Export to file: {args.output}")
+                lib.write_output(output['res'], args.output)
+
+            else: # export displacement components (dxx, dyy)
+                parent = Path(args.output).parent
+                suffix = Path(args.output).suffix
+                stem = Path(args.output).stem
+
+                for cm in ["dxx", "dyy"]:
+                    _outfile = parent / (stem + f"_{cm}.{suffix}")
+                    logger.info(f"Export {cm} to file: {_outfile}")
+                    lib.write_output(output[cm], _outfile)
+        
+        else: # export vector (for SKIPCCV algorithm)
+            lib.write_output(output, args.output)

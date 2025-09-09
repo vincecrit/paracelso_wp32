@@ -41,7 +41,7 @@ import rasterio as rio
 from rasterio.transform import from_bounds
 
 from sensetrack.ot.interfaces import Image
-from sensetrack.ot.lib import image_to_rasterio
+from sensetrack.ot.lib import image_to_geotiff
 
 hdf5_dir = "hdf5"
 gtif_dir = "gtif"
@@ -248,7 +248,7 @@ def main():
     wd = Path(parms.file).parent
     stem = Path(parms.file).stem
     outfile = wd / (stem+f"[{parms.datacube}_{parms.band}].tif")
-    image_to_rasterio(img, outfile)
+    image_to_geotiff(img, outfile)
 
 
 if __name__ == "__main__":

@@ -143,7 +143,7 @@ def rasterio_open(source: str | Path, band: int | None = None) -> tuple:
         raise
 
 
-def image_to_rasterio(img: Image, outfile: str | Path) -> None:
+def image_to_geotiff(img: Image, outfile: str | Path) -> None:
     """
     Save an Image object to a raster file using rasterio.
     
@@ -205,15 +205,15 @@ def write_output(output, outfile: str | Path) -> None:
 
     match outfile.suffix:
         case ".tiff":
-            image_to_rasterio(output, outfile)
+            image_to_geotiff(output, outfile)
         case ".tif":
-            image_to_rasterio(output, outfile)
+            image_to_geotiff(output, outfile)
         case ".jpg":
-            image_to_rasterio(output, outfile)
+            image_to_geotiff(output, outfile)
         case ".jpeg":
-            image_to_rasterio(output, outfile)
+            image_to_geotiff(output, outfile)
         case ".png":
-            image_to_rasterio(output, outfile)
+            image_to_geotiff(output, outfile)
         case ".gpkg":
             geopandas_to_ogr(output, outfile)
         case ".shp":

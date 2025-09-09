@@ -30,6 +30,7 @@ import json
 from abc import ABC
 from inspect import signature
 from pathlib import Path
+from typing import Any
 
 import cv2
 import numpy as np
@@ -386,7 +387,7 @@ class OTAlgorithm(ABC):
 
         Path(file).write_text(json.dumps(parms, indent=4))
 
-    def _to_displacements(self, transform, pixel_offsets) -> np.ndarray:
+    def _to_displacements(self, transform, pixel_offsets) -> tuple[np.ndarray, np.ndarray]:
         """
         Convert pixel offsets to physical displacements.
 
@@ -406,6 +407,6 @@ class OTAlgorithm(ABC):
         px, py = pixel_offsets.T
         dxx, dyy = px.T * pxt, py.T * pyt
 
-        return np.linalg.norm([dxx, dyy], axis=0)
+        return dxx, dyy
 
-    def __call__(self, *args, **kwargs): ...
+    def __call__(self, *args, **kwargs) -> Any: ...
