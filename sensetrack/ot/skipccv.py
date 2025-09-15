@@ -1,13 +1,14 @@
 """
-skipccv.py
-This module provides a command-line interface (CLI) for running the SkiPCC_Vector algorithm from the sensetrack.ot.algorithms package. 
+# CLI interface for `ot.algorithms.SkiPCC_Vector` algorithm
+
+This module provides a command-line interface (CLI) for running the SkiPCC_Vector algorithm from the sensetrack.ot.algorithms package.
 It extends the BaseCLI class to parse and handle specific arguments related to the SkiPCC_Vector algorithm.
 
-Classes:
+# Classes
 
     SKIPCCV_CLI: Command-line interface class for configuring and running the `SkiPCC_Vector` algorithm.
 
-Arguments:
+# Arguments
 
     --phase_norm : bool (default: True)
         If set, applies phase normalization as described in the PHASENORM help message.
@@ -34,13 +35,13 @@ class SKIPCCV_CLI(BaseCLI):
 
     def add_specific_args(self):
         self.parser.add_argument(
-            "--phase_norm", help=PHASENORM, action="store_true", default=True)
+            "--phase_norm", help=PHASENORM, action="store_true", default=True
+        )
         self.parser.add_argument(
-            "--upsmp_fac", help=UPSAMPLE_FACTOR, type=float, default=1.0)
-        self.parser.add_argument(
-            "--step_size", help=STEPSIZE, type=int, default=1)
-        self.parser.add_argument(
-            "--winsize", help=WINSIZE, type=int, default=4)
+            "--upsmp_fac", help=UPSAMPLE_FACTOR, type=float, default=1.0
+        )
+        self.parser.add_argument("--step_size", help=STEPSIZE, type=int, default=1)
+        self.parser.add_argument("--winsize", help=WINSIZE, type=int, default=4)
 
 
 if __name__ == "__main__":

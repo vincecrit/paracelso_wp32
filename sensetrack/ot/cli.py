@@ -1,36 +1,27 @@
 """
-cli.py
+# CLI interface
+
 This module provides a command-line interface (CLI) for the Offset-Tracking (OT) component of the sensetrack package.
 It allows users to perform offset-tracking between two input images (reference and target) with configurable preprocessing
 and output options.
 
-Classes:
+## Classes
 
     BaseCLI: Base class for building CLI applications for offset-tracking algorithms. Handles argument parsing, image loading,
              preprocessing, algorithm execution, and output writing.
 
-Arguments:
+## Arguments
 
-    -r, --reference     Path to the reference image (required).
-    -t, --target        Path to the target image (required).
-    -o, --output        Path to the output file (default: "output.tif").
-    -b, --band          Band index to process (optional).
-    --nodata            Value to use for nodata pixels (optional).
-    -prep, --preprocessing  Preprocessing method to apply (default: "equalize").
+    -r, --reference          Path to the reference image (required).
+    -t, --target             Path to the target image (required).
+    -o, --output             Path to the output file (default: "output.tif").
+    -b, --band               Band index to process (optional).
+    --nodata                 Value to use for nodata pixels (optional).
+    -prep, --preprocessing   Preprocessing method to apply (default: "equalize").
     --resultant_displacement Whether or not to export resultant displacement.
     If `False` exports two images for x and y displacements. Ignored for SKIPCCV output. Defaluts to `True`
 
-Dependencies:
-
-    - argparse
-    - pathlib.Path
-    - sensetrack.log
-    - sensetrack.ot.lib
-    - sensetrack.ot.helpmsg
-    - sensetrack.ot.image_processing.dispatcher
-    - sensetrack.ot.interfaces.OTAlgorithm
-
-Typical workflow:
+### Typical workflow
 
     1. Parse command-line arguments.
     2. Load reference and target images.
@@ -44,7 +35,7 @@ from pathlib import Path
 
 from sensetrack.log import setup_logger
 from sensetrack.ot import lib
-from sensetrack.ot.helpmsg import BAND, NODATA, OUTPUT, REFERENCE, TARGET, RES
+from sensetrack.ot.helpmsg import BAND, NODATA, OUTPUT, REFERENCE, RES, TARGET
 from sensetrack.ot.image_processing import dispatcher
 from sensetrack.ot.interfaces import OTAlgorithm
 
@@ -68,7 +59,9 @@ class BaseCLI:
         )
         self.parser.add_argument("-b", "--band", help=BAND, default=None, type=int)
         self.parser.add_argument("--nodata", help=NODATA, default=None, type=float)
-        self.parser.add_argument("--resultant_displacement", help=RES, default=True, type=bool)
+        self.parser.add_argument(
+            "--resultant_displacement", help=RES, default=True, type=bool
+        )
         self.parser.add_argument(
             "-prep", "--preprocessing", default="equalize", type=str
         )
@@ -100,11 +93,11 @@ class BaseCLI:
         logger.info(f"Algorithm {algorithm.__class__.__name__} successfully completed")
 
         if isinstance(output, dict):
-            if args.resultant_displacement: # export resultant displacements
+            if args.resultant_displacement:  # export resultant displacements
                 logger.info(f"Export to file: {args.output}")
-                lib.write_output(output['res'], args.output)
+                lib.write_output(output["res"], args.output)
 
-            else: # export displacement components (dxx, dyy)
+            else:  # export displacement components (dxx, dyy)
                 parent = Path(args.output).parent
                 suffix = Path(args.output).suffix
                 stem = Path(args.output).stem
@@ -113,6 +106,6 @@ class BaseCLI:
                     _outfile = parent / (stem + f"_{cm}.{suffix}")
                     logger.info(f"Export {cm} to file: {_outfile}")
                     lib.write_output(output[cm], _outfile)
-        
-        else: # export vector (for SKIPCCV algorithm)
+
+        else:  # export vector (for SKIPCCV algorithm)
             lib.write_output(output, args.output)
