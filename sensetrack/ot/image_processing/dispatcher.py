@@ -2,6 +2,7 @@
 This module implements a dispatcher pattern for image preprocessing operations,
 allowing registration and execution of both OpenCV and scikit-image based processing methods.
 """
+
 from sensetrack.log import setup_logger
 from sensetrack.ot.image_processing import opencv, ski
 
@@ -48,11 +49,29 @@ class PreprocessDispatcher:
 
         Exits:
             If the requested process name is not found in the registry
+
+        # Examples:
+
+        ## Retrieving the CLAHE function for OpenCV-based optical flow
+        >>> from sensetrack.ot.algorithms import OpenCVOpticalFlow
+        >>> from senstrack.ot.image_processing import dispatcher
+        >>> from sensetrack.ot import lib
+        ### Loading images (they will be coregistered if needed)
+        >>> ref, tar = lib.load_images("ref.tif", "tar.tif")
+        ### OpenCV optical flow
+        >>> OT = OpenCVOpticalFlow.from_dict({"pyr_scale":0.5, "levels":4, "winsize":16})
+        ### OT instance has its `library` attribute:
+        >>> print(OT.library)
+        'OpenCV'
+        ### The dispatcher can be called:
+        >>> ref_clahe = dispatcher.dispatch_process(f"{OT.library}_clahe", array = ref)
+        >>> tar_clahe = dispatcher.dispatch_process(f"{OT.library}_clahe", array = tar)
         """
         if not name in self.processes:
             logger.critical(
-                f"Method {name.upper()} is not among registered ones: " +
-                f"{self.processes.keys()}")
+                f"Method {name.upper()} is not among registered ones: "
+                + f"{self.processes.keys()}"
+            )
             exit(0)
         else:
             for process in self.processes[name]:
@@ -65,7 +84,7 @@ dispatcher = PreprocessDispatcher()
 # Register scikit-image methods
 for funcname in ski.__all__:
     try:
-        dispatcher.register("skimage_"+funcname, eval(f"ski.{funcname}"))
+        dispatcher.register("skimage_" + funcname, eval(f"ski.{funcname}"))
     except AttributeError as err:
         logger.critical(f"{funcname} is not among registerable methods")
         exit(0)
@@ -73,7 +92,7 @@ for funcname in ski.__all__:
 # Register OpenCV methods
 for funcname in opencv.__all__:
     try:
-        dispatcher.register("OpenCV_"+funcname, eval(f"opencv.{funcname}"))
+        dispatcher.register("OpenCV_" + funcname, eval(f"opencv.{funcname}"))
     except AttributeError as err:
         logger.critical(f"{funcname} is not among registerable methods")
         exit(0)

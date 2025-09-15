@@ -16,7 +16,7 @@ The `sensetrack.ot` subpackage provides core functionalities for optical flow an
 
 ### Module Structure
 - `algorithms.py`  
-  Implements classes and functions for calculating optical flow and phase cross-correlation between images. Provides wrappers for OpenCV and scikit-image algorithms, along with utilities for converting results to DataFrame or GeoDataFrame.
+  Implements classes and functions for calculating optical flow and phase cross-correlation between images. Provides wrappers for OpenCV and scikit-image algorithms.
 - `cli.py`  
   Implements the Command Line Interface for launching optical flow processes, normalization, and other operations directly from the terminal.
 - `helpmsg.py`  
@@ -25,18 +25,18 @@ The `sensetrack.ot` subpackage provides core functionalities for optical flow an
   Defines classes for image representation, band management, and abstract interfaces for tracking algorithms.
 - `lib.py`  
   Support functions and common utilities for image manipulation, format conversions, and recurring mathematical operations.
-- `methods.py`  
-  Factory for creating instances of optical flow algorithms. Allows dynamic selection and configuration of the desired algorithm via name or parameters.
 - `opencvof.py`  
-  Implementation of OpenCV-based optical flow algorithms (e.g., Farneback, Lucas-Kanade). Enables detailed parameter configuration and integration with processing pipelines.
-- `skiofilk.py`  
-  Implementation of the ILK (Iterative Lucas-Kanade) algorithm via scikit-image.
-- `skioftvl1.py`  
-  Implementation of the TV-L1 (Total Variation L1) algorithm via scikit-image, robust for noisy images and intensity variations.
-- `skipccv.py`  
-  Implementation of Phase Cross-Correlation (PCC Vector) for sub-pixel displacement estimation between images. Unlike other algorithms that return displacement maps in raster format, `skipccv` will return a georeferenced vector file where each point represents the center of the search window, associated with displacements in the two main directions (fields `RSHIFT` and `CSHIFT`), the resulting displacement (`L2`), and the normalized root mean square deviation between analyzed moving windows (`NRMS`).
+  The `algorithms.OpenCVOpticalFlow` algorithm provides a Python interface to the Farneback dense optical flow method, as implemented in OpenCV’s `calcOpticalFlowFarneback` function. This approach estimates the motion field between two images by analyzing the apparent movement of pixel intensities, producing a dense displacement vector for every pixel. The core of the algorithm relies on constructing image pyramids, which allow it to capture both large and small displacements by progressively analyzing the images at multiple scales. At each level, the algorithm models local neighborhoods with polynomial expansions, enabling it to robustly estimate motion even in the presence of noise or textureless regions. The flexibility of the implementation allows users to fine-tune parameters such as the pyramid scale, window size, number of iterations, and the degree of smoothing, thus balancing accuracy and computational efficiency. After computing the flow, the results are transformed into images representing the horizontal and vertical components of the displacement, as well as the overall magnitude
+- `skiofilk.py`
+  The `algorithms.SkiOpticalFlowILK` algorithm offers a Python interface to the Inverse Lucas-Kanade (ILK) method for dense optical flow estimation, as implemented in scikit-image’s `optical_flow_ilk` function. This approach is designed to estimate the pixel-wise motion between two images by analyzing local intensity variations and tracking how small neighborhoods shift from the reference to the target image. The ILK method operates by minimizing the difference between the reference and the warped target image, iteratively refining the displacement field to achieve the best alignment. It is particularly well-suited for scenarios where the motion is relatively small and smooth, as it assumes that the displacement within each local window can be approximated linearly. The algorithm allows for customization of parameters such as the radius of the local window, the number of warping iterations, and the use of Gaussian smoothing or prefiltering, enabling users to adapt the method to different noise levels and image characteristics. After computing the displacement vectors, the results are transformed according to the affine properties of the target image, producing output images that represent the horizontal and vertical components of the motion, as well as the overall displacement magnitude
+- `skioftvl1.py`
+  The `algorithms.SkiOpticalFlowTVL1` algorithm provides a Python interface to the TV-L1 optical flow method, as implemented in scikit-image’s `optical_flow_tvl1` function. This approach is based on a variational framework that seeks to estimate the dense motion field between two images by minimizing an energy functional composed of a data attachment term and a regularization term. The TV-L1 method is particularly robust to noise and outliers, thanks to its use of the L1 norm for the data term and total variation (TV) regularization, which encourages piecewise-smooth motion fields while preserving sharp motion boundaries. The algorithm iteratively refines the displacement field through a multi-scale, coarse-to-fine strategy, allowing it to capture both large and small motions. Users can adjust parameters such as the strength of the data and regularization terms, the number of warping and optimization iterations, and the use of prefiltering, making the method adaptable to a wide range of imaging conditions. After the optical flow is computed, the results are mapped to the affine space of the target image, producing output images for the horizontal and vertical components of the displacement, as well as the overall magnitude  
+- `skipccv.py`
+  The `algorithms.SkiPCC_Vector` algorithm implements a phase cross-correlation (PCC) approach for estimating local displacements between two images, leveraging the `phase_cross_correlation` function from scikit-image. Unlike traditional optical flow methods that rely on intensity gradients, this technique operates in the frequency domain. Since the base function `phase_cross_correlation` outputs a single displacement for two input arrays, this implementation provides an utility for splitting the two images into several sub-arrays in a rolling-window fashion (see the `stepped_rolling_window` help for further details), than `phase_cross_correlation` is performed for each pair of windows, and the results are collected in a dataframe-like structure where each record is associated with displacements in the two directions (fields `RSHIFT` and `CSHIFT` for row and column displacement respectively), the resultant displacement (`L2`), and the normalized root mean square deviation between analyzed moving windows (`NRMS`). By using phase normalization, the method enhances its sensitivity to translational differences while suppressing the influence of amplitude variations. The process can be further refined by adjusting the window size, step size, and upsampling factor, allowing for subpixel accuracy in the displacement estimates.
 - `image_processing/`  
   Sub-package with modules for normalization, equalization, conversion, and advanced manipulation of raster images and arrays.
+  It is developed with the dispatcher pattern in order to be further extended with new features.
+  Each processing function in implemented specifically for each library imployed by `sensetrack`, so that, for instance, the clahe algortihm is implemented in both `image_processing.opencv.py` and `image_processing.ski.py` sub-modules. The correct function can be dinamically called by using the `dispacther.dispatch_process`. 
 
 ### Main Features
 - Abstract interfaces for multi-band image management
@@ -51,7 +51,7 @@ from sensetrack.ot.interfaces import Image
 from sensetrack.lib import (rasterio_open,
                             image_to_rasterio,
                             basic_pixel_coregistration)
-from sensetrack.ot.algoritmi import OpenCVOpticalFlow
+from sensetrack.ot.algorithms import OpenCVOpticalFlow
 
 # Get reference image
 ref = Image(*rasterio_open("ref.tif", band = 1), nodata = -9999.)
@@ -60,7 +60,12 @@ tar = basic_pixel_coregistration(infile = "tar.tif", match = "ref.tif")
 # Optical flow (Gunnar Farneback)
 OT = OpenCVOpticalFlow.from_dict({"pyr_scale":0.5, "levels":4, "winsize":16})
 result = OT(reference=ref, target=tar)
-image_to_rasterio(result, "output.tif")
+# Output: x-displacements
+image_to_rasterio(result['dxx'], "output-x.tif")
+# Output: y-displacements
+image_to_rasterio(result['dyy'], "output-y.tif")
+# Output: resultant displacements
+image_to_rasterio(result['res'], "output-res.tif")
 ```
 
 ### CLI
@@ -69,6 +74,8 @@ To launch the same analysis from terminal (coregistration is performed by defaul
 python -m sensetrack.ot.opencvof --reference ref.tif --target tar.tif 
   --output output.tif --winsize 16 --levels 4
 ```
+By default it outputs the resultant displacements raster, to change this behaviour
+pass the `--resultant_displacement False` as input
 
 ### Implemented Algorithms
 
@@ -100,7 +107,6 @@ python -m sensetrack.ot.opencvof --reference ref.tif --target tar.tif
 - All algorithms are configurable via Python parameters or CLI.
 - The module is designed to be extensible: new algorithms can be added by implementing the provided interfaces.
 - Output can be saved in various formats, including raster and DataFrame.
-
 ---
 
 ## SNAP-GPT Submodule (snap_gpt)
