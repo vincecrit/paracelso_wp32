@@ -60,7 +60,7 @@ class BaseCLI:
         self.parser.add_argument("-b", "--band", help=BAND, default=None, type=int)
         self.parser.add_argument("--nodata", help=NODATA, default=None, type=float)
         self.parser.add_argument(
-            "--resultant_displacement", help=RES, default=True, type=bool
+            "--resultant_displacement", help=RES, action="store_true"
         )
         self.parser.add_argument(
             "-prep", "--preprocessing", default="equalize", type=str
@@ -103,7 +103,7 @@ class BaseCLI:
                 stem = Path(args.output).stem
 
                 for cm in ["dxx", "dyy"]:
-                    _outfile = parent / (stem + f"_{cm}.{suffix}")
+                    _outfile = parent / (stem + f"_{cm}{suffix}")
                     logger.info(f"Export {cm} to file: {_outfile}")
                     lib.write_output(output[cm], _outfile)
 

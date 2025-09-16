@@ -300,8 +300,8 @@ class OpenCVOpticalFlow(OTAlgorithm):
             iterations=self.iterations,
             poly_n=self.poly_n,
             poly_sigma=self.poly_sigma,
-            flags=self.flags,
-        )  # type: ignore
+            flags=self.flags,  # type: ignore
+        )
 
         dxx, dyy = self._to_displacements(target.affine, pixel_offsets)
 
