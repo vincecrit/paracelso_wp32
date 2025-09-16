@@ -60,7 +60,7 @@ class BaseCLI:
         self.parser.add_argument("-b", "--band", help=BAND, default=None, type=int)
         self.parser.add_argument("--nodata", help=NODATA, default=None, type=float)
         self.parser.add_argument(
-            "--resultant_displacement", help=RES, default=True, type=bool
+            "--resultant_displacement", help=RES, action="store_true"
         )
         self.parser.add_argument(
             "-prep", "--preprocessing", default="equalize", type=str
