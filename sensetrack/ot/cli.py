@@ -103,7 +103,7 @@ class BaseCLI:
                 stem = Path(args.output).stem
 
                 for cm in ["dxx", "dyy"]:
-                    _outfile = parent / (stem + f"_{cm}.{suffix}")
+                    _outfile = parent / (stem + f"_{cm}{suffix}")
                     logger.info(f"Export {cm} to file: {_outfile}")
                     lib.write_output(output[cm], _outfile)
 
