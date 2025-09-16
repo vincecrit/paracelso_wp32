@@ -1,7 +1,10 @@
 __pycache__/
+.obsidian
 build/
 dist/
 *.egg-info/
 *.egg
 tests
 docs/
+paper/
+*.vscode/

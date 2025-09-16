@@ -30,6 +30,7 @@ Note:
 
     This script is intended for use with PRISMA satellite data products in HDF5 format.
 """
+
 from argparse import ArgumentParser
 from pathlib import Path
 from typing import Iterable
@@ -76,19 +77,21 @@ def get_swir_bandwidths(h5_file):
         ValueError: If the required attributes are not found or are not numpy arrays.
     """
     with h5py.File(h5_file, "r") as f:
-        list_cw_swir = f['/'].attrs['List_Cw_Swir']
-        list_fwhm_swir = f['/'].attrs['List_Fwhm_Swir']
+        list_cw_swir = f["/"].attrs["List_Cw_Swir"]
+        list_fwhm_swir = f["/"].attrs["List_Fwhm_Swir"]
 
     if isinstance(list_fwhm_swir, np.ndarray) and isinstance(list_cw_swir, np.ndarray):
-        swir_info = np.c_[list_cw_swir + (list_fwhm_swir/2),
-                          list_cw_swir - (list_fwhm_swir/2),
-                          list_fwhm_swir]
+        swir_info = np.c_[
+            list_cw_swir + (list_fwhm_swir / 2),
+            list_cw_swir - (list_fwhm_swir / 2),
+            list_fwhm_swir,
+        ]
         return swir_info
     else:
         raise ValueError("No data found")
 
 
-def get_vnir_bandwidths(h5_file):
+def get_vnir_bandwidths(h5_file) -> np.ndarray:
     """
     Extracts the VNIR band center wavelengths and FWHM values from a PRISMA HDF5 file.
 
@@ -102,13 +105,15 @@ def get_vnir_bandwidths(h5_file):
         ValueError: If the required attributes are not found or are not numpy arrays.
     """
     with h5py.File(h5_file, "r") as f:
-        list_cw_vnir = f['/'].attrs['List_Cw_Vnir']
-        list_fwhm_vnir = f['/'].attrs['List_Fwhm_Vnir']
+        list_cw_vnir = f["/"].attrs["List_Cw_Vnir"]
+        list_fwhm_vnir = f["/"].attrs["List_Fwhm_Vnir"]
 
     if isinstance(list_fwhm_vnir, np.ndarray) and isinstance(list_cw_vnir, np.ndarray):
-        vnir_info = np.c_[list_cw_vnir + (list_fwhm_vnir/2),
-                          list_cw_vnir - (list_fwhm_vnir/2),
-                          list_fwhm_vnir]
+        vnir_info = np.c_[
+            list_cw_vnir + (list_fwhm_vnir / 2),
+            list_cw_vnir - (list_fwhm_vnir / 2),
+            list_fwhm_vnir,
+        ]
         return vnir_info
     else:
         raise ValueError("No data found")
@@ -131,7 +136,7 @@ def get_prisma_dataset_bounds(src: h5py.File) -> dict:
         "Product_LLcorner_easting",
         "Product_LRcorner_northing",
         "Product_URcorner_easting",
-        "Product_ULcorner_northing"
+        "Product_ULcorner_northing",
     ]
 
     bound_names = ["west", "south", "east", "north"]
@@ -164,12 +169,13 @@ def get_band_from_h5dataset_array(ds: h5py.Dataset, band: int) -> np.ndarray:
         return ds[:, band, :]
     except IndexError:
         raise IndexError(
-            f"Maximum number of bands available for datacube is {ds.shape[1]}")
+            f"Maximum number of bands available for datacube is {ds.shape[1]}"
+        )
 
 
-def get_prisma_image(prisma_file: str | Path,
-                     datacube: str = 'pan',
-                     band: Iterable | int | None = None) -> Image:
+def get_prisma_image(
+    prisma_file: str | Path, datacube: str = "pan", band: Iterable | int | None = None
+) -> Image:
     """
     Extracts a specific band or bands from a PRISMA HDF5 file and returns an Image object.
 
@@ -192,22 +198,21 @@ def get_prisma_image(prisma_file: str | Path,
         bounds = get_prisma_dataset_bounds(src)
 
         match datacube:
-            case 'pan':
-                ds = src.get(
-                    "HDFEOS/SWATHS/PRS_L2D_PCO/Data Fields/Cube", None)
+            case "pan":
+                ds = src.get("HDFEOS/SWATHS/PRS_L2D_PCO/Data Fields/Cube", None)
                 band = None
                 bandwidths = None
-            case 'swir':
-                ds = src.get(
-                    "HDFEOS/SWATHS/PRS_L2D_HCO/Data Fields/SWIR_Cube", None)
+            case "swir":
+                ds = src.get("HDFEOS/SWATHS/PRS_L2D_HCO/Data Fields/SWIR_Cube", None)
                 bandwidths = get_swir_bandwidths(prisma_file)
-            case 'vnir':
-                ds = src.get(
-                    "HDFEOS/SWATHS/PRS_L2D_HCO/Data Fields/VNIR_Cube", None)
+            case "vnir":
+                ds = src.get("HDFEOS/SWATHS/PRS_L2D_HCO/Data Fields/VNIR_Cube", None)
                 bandwidths = get_vnir_bandwidths(prisma_file)
+            case _:
+                raise ValueError
 
-        assert isinstance(
-            ds, h5py.Dataset), f"No dataset found in `{datacube}`"
+        assert isinstance(bandwidths, np.ndarray)
+        assert isinstance(ds, h5py.Dataset), f"No dataset found in `{datacube}`"
         assert isinstance(bandwidths, np.ndarray)
 
         if band is None:
@@ -222,19 +227,27 @@ def get_prisma_image(prisma_file: str | Path,
             channels = [get_band_from_h5dataset_array(ds, b) for b in band]
             array = cv2.merge(channels)
             height, width, _ = array.shape
+        else:
+            raise ValueError(
+                f"Unrecognized band input. Expected int or Itearable, received {type(band)}"
+            )
 
         affine = from_bounds(**bounds, width=width, height=height)
 
-        return Image(array, affine, "EPSG:"+str(epsg), 0)
+        return Image(array, affine, "EPSG:" + str(epsg), 0)
 
 
 def _get_parser():
     parser = ArgumentParser()
-    parser.add_argument('-d', '--datacube', default='pan', type=str,
-                        help='Dataset (avaiable options: `pan`, `swir` e `vnir`)')
-    parser.add_argument('-b', '--band', default=0, type=int,
-                        help='Selected band')
-    parser.add_argument('-f', '--file', help='PRISMA file (*.h5)')
+    parser.add_argument(
+        "-d",
+        "--datacube",
+        default="pan",
+        type=str,
+        help="Dataset (avaiable options: `pan`, `swir` e `vnir`)",
+    )
+    parser.add_argument("-b", "--band", default=0, type=int, help="Selected band")
+    parser.add_argument("-f", "--file", help="PRISMA file (*.h5)")
 
     return parser
 
@@ -247,7 +260,7 @@ def main():
     img = get_prisma_image(parms.file, parms.datacube, parms.band)
     wd = Path(parms.file).parent
     stem = Path(parms.file).stem
-    outfile = wd / (stem+f"[{parms.datacube}_{parms.band}].tif")
+    outfile = wd / (stem + f"[{parms.datacube}_{parms.band}].tif")
     image_to_geotiff(img, outfile)
 
 
