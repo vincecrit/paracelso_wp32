@@ -13,6 +13,7 @@ Classes:
     - GPTSubsetter: Utility for extracting subset areas
     - SARPreprocessor: Abstract base class for SAR preprocessing
 """
+
 """
 SNAP Graph Processing Tool (GPT) library for SAR data processing.
 
@@ -33,21 +34,29 @@ from abc import ABC
 from collections import namedtuple
 from enum import Enum, unique
 from pathlib import Path
-from pathlib import Path
 
 import geopandas as gpd
 
 from sensetrack import GRAPHS_WD
-from sensetrack.cosmo.utils import (csg_mean_incidence_angle_rad,
-                                    csk_mean_incidence_angle_rad)
+from sensetrack.cosmo.utils import (
+    csg_mean_incidence_angle_rad,
+    csk_mean_incidence_angle_rad,
+)
 from sensetrack.log import setup_logger
 from sensetrack.sentinel.lib import s1_mean_incidence_angle_rad
 
 logger = setup_logger(__name__)
 
 
-MultiLook = namedtuple("MultiLook", ["Num_Range_LOOKS", "Num_Azimuth_LOOKS",
-                       "Estimated_RangeResolution", "Estimated_AzimuthResolution"])
+MultiLook = namedtuple(
+    "MultiLook",
+    [
+        "Num_Range_LOOKS",
+        "Num_Azimuth_LOOKS",
+        "Estimated_RangeResolution",
+        "Estimated_AzimuthResolution",
+    ],
+)
 """
 Named tuple for multilook parameters and resulting resolutions.
 
@@ -76,6 +85,7 @@ class SARResolutions(ABC):
         RRES (float): Range resolution in meters
         ARES (float): Azimuth resolution in meters
     """
+
     """
     Abstract base class defining SAR sensor resolution parameters.
 
@@ -89,6 +99,7 @@ class SARResolutions(ABC):
 
 class S1_IW_SLC(SARResolutions):
     """Sentinel-1 IW SLC product resolutions."""
+
     """Sentinel-1 IW SLC product resolutions."""
     RRES = 2.30  # RANGE RESOLUTION
     ARES = 14.10  # AZIMUTH RESOLUTION
@@ -96,6 +107,7 @@ class S1_IW_SLC(SARResolutions):
 
 class CSK_HIMAGE_SLC(SARResolutions):
     """COSMO-SkyMed HIMAGE SLC product resolutions."""
+
     """COSMO-SkyMed HIMAGE SLC product resolutions."""
     RRES = 3.0  # RANGE RESOLUTION (AFAIK)
     ARES = 3.0  # AZIMUTH RESOLUTION (AFAIK)
@@ -103,6 +115,7 @@ class CSK_HIMAGE_SLC(SARResolutions):
 
 class CSG_HIMAGE_SLC(SARResolutions):
     """COSMO-SkyMed Second Generation HIMAGE SLC product resolutions."""
+
     """COSMO-SkyMed Second Generation HIMAGE SLC product resolutions."""
     RRES = 2.6488857702529085  # RANGE RESOLUTION (AFAIK)
     ARES = 2.6488857702529085  # AZIMUTH RESOLUTION (AFAIK)
@@ -116,6 +129,7 @@ class SARPreprocessing(Enum):
     Each member corresponds to a specific XML file in the GRAPHS_WD directory
     that defines the processing graph for SNAP GPT.
     """
+
     """
     Enumeration mapping preprocessing workflows to their XML graph files.
 
@@ -214,9 +228,8 @@ class GPTSubsetter:
         else:
             file, layername = aoi, None
 
-        geometry = gpd.read_file(file, layer=layername).to_crs(
-            "EPSG:4326").geometry[0]
-        
+        geometry = gpd.read_file(file, layer=layername).to_crs("EPSG:4326").geometry[0]
+
         return Subset(layername, geometry)
 
 
@@ -245,9 +258,12 @@ class SARPreprocessor(ABC):
         self.SUBSET = SUBSET
         self.PROCESS = PROCESS
 
-    def estimate_multilook_parms(self, filename: str | Path,
-                                 native_resolution: SARResolutions,
-                                 n_az_looks: int = 1):
+    def estimate_multilook_parms(
+        self,
+        filename: str | Path,
+        native_resolution: SARResolutions,
+        n_az_looks: int = 1,
+    ):
         """
         Estimate optimal multilook parameters for a SAR product.
 
@@ -299,11 +315,14 @@ class SARPreprocessor(ABC):
 
         else:
             raise NotImplementedError(
-                f"{native_resolution.__class__.__name__} does not exists.")
+                f"{native_resolution.__class__.__name__} does not exists."
+            )
 
-        assert incidence_angle is not None, f"{self.__class__.__name__}.estimate_multilook_parms: {incidence_angle = }"
+        assert (
+            incidence_angle is not None
+        ), f"{self.__class__.__name__}.estimate_multilook_parms: {incidence_angle = }"
 
-        candidate_n = range(1, int(n_az_looks*5))
+        candidate_n = range(1, int(n_az_looks * 5))
         az_rg_res = list()
         diffs = list()
 
@@ -311,11 +330,11 @@ class SARPreprocessor(ABC):
             rg_res = native_resolution.RRES * n / math.sin(incidence_angle)
             az_res = n_az_looks * native_resolution.ARES
             az_rg_res.append([rg_res, az_res])
-            diffs.append(math.sqrt((rg_res - az_res)**2))
+            diffs.append(math.sqrt((rg_res - az_res) ** 2))
 
         index = diffs.index(min(diffs))
         n_rg_looks = candidate_n[index]
         rg_res, az_res = az_rg_res[index]
         return MultiLook(n_rg_looks, n_az_looks, rg_res, az_res)
 
-    def run(self, *args, **kwargs): ...
+    def run(self, *args, **kwargs) -> Path: ...
