@@ -9,6 +9,13 @@
 
 ---
 
+## Installation
+```bash
+git clone https://github.com/vincecrit/paracelso_wp32.git
+cd paracelso_wp32
+python -m pip install -e
+```
+
 ## Offset-Tracking Submodule (ot)
 
 ### Overview
