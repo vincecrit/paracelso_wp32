@@ -6,5 +6,4 @@ dist/
 *.egg
 tests
 docs/
-paper/
 *.vscode/
